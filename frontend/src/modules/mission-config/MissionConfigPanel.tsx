@@ -41,7 +41,7 @@ function NumberField({ label, value, onChange, unit, min, max, step = 1 }: {
       <label className="text-[11px] uppercase tracking-wider text-[var(--text-tertiary)] font-sans">
         {label}
       </label>
-      <div className="flex items-center gap-1">
+      <div className="relative">
         <input
           type="number"
           value={value}
@@ -49,9 +49,13 @@ function NumberField({ label, value, onChange, unit, min, max, step = 1 }: {
           min={min}
           max={max}
           step={step}
-          className="input-field flex-1 text-sm font-mono"
+          className="input-field w-full text-sm font-mono pr-12"
         />
-        {unit && <span className="text-[10px] text-[var(--text-tertiary)] font-mono w-10">{unit}</span>}
+        {unit && (
+          <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[11px] text-[var(--text-secondary)] font-mono pointer-events-none">
+            {unit}
+          </span>
+        )}
       </div>
     </div>
   )

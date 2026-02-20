@@ -107,7 +107,7 @@ export default function LinkBudgetSection() {
                 className="w-16 rounded border border-white/10 bg-white/[0.06] px-2 py-1 text-xs font-mono text-[var(--text-primary)] text-center focus:border-accent-blue focus:outline-none"
                 step="1"
               />
-              <span className="text-[10px] text-[var(--text-tertiary)] font-mono w-8">dBi</span>
+              <span className="text-[11px] text-[var(--text-secondary)] font-mono w-8">dBi</span>
             </div>
           </div>
           <div className="flex items-center justify-between">
@@ -120,7 +120,7 @@ export default function LinkBudgetSection() {
                 className="w-16 rounded border border-white/10 bg-white/[0.06] px-2 py-1 text-xs font-mono text-[var(--text-primary)] text-center focus:border-accent-blue focus:outline-none"
                 step="50"
               />
-              <span className="text-[10px] text-[var(--text-tertiary)] font-mono w-8">K</span>
+              <span className="text-[11px] text-[var(--text-secondary)] font-mono w-8">K</span>
             </div>
           </div>
           <div className="flex items-center justify-between">
@@ -133,7 +133,7 @@ export default function LinkBudgetSection() {
                 className="w-16 rounded border border-white/10 bg-white/[0.06] px-2 py-1 text-xs font-mono text-[var(--text-primary)] text-center focus:border-accent-blue focus:outline-none"
                 step="0.5"
               />
-              <span className="text-[10px] text-[var(--text-tertiary)] font-mono w-8">dB</span>
+              <span className="text-[11px] text-[var(--text-secondary)] font-mono w-8">dB</span>
             </div>
           </div>
           <div className="flex items-center justify-between">
@@ -146,7 +146,7 @@ export default function LinkBudgetSection() {
                 className="w-16 rounded border border-white/10 bg-white/[0.06] px-2 py-1 text-xs font-mono text-[var(--text-primary)] text-center focus:border-accent-blue focus:outline-none"
                 step="0.5"
               />
-              <span className="text-[10px] text-[var(--text-tertiary)] font-mono w-8">dB</span>
+              <span className="text-[11px] text-[var(--text-secondary)] font-mono w-8">dB</span>
             </div>
           </div>
           <div className="flex items-center justify-between">
@@ -159,7 +159,7 @@ export default function LinkBudgetSection() {
                 className="w-16 rounded border border-white/10 bg-white/[0.06] px-2 py-1 text-xs font-mono text-[var(--text-primary)] text-center focus:border-accent-blue focus:outline-none"
                 step="0.1"
               />
-              <span className="text-[10px] text-[var(--text-tertiary)] font-mono w-8">dB</span>
+              <span className="text-[11px] text-[var(--text-secondary)] font-mono w-8">dB</span>
             </div>
           </div>
           <div className="flex items-center justify-between">
@@ -172,7 +172,7 @@ export default function LinkBudgetSection() {
                 className="w-16 rounded border border-white/10 bg-white/[0.06] px-2 py-1 text-xs font-mono text-[var(--text-primary)] text-center focus:border-accent-blue focus:outline-none"
                 step="0.5"
               />
-              <span className="text-[10px] text-[var(--text-tertiary)] font-mono w-8">dB</span>
+              <span className="text-[11px] text-[var(--text-secondary)] font-mono w-8">dB</span>
             </div>
           </div>
         </div>

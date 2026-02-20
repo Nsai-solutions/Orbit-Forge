@@ -45,7 +45,7 @@ export default function PassPredictionPanel() {
                 min="1"
                 max="14"
               />
-              <span className="text-[10px] text-[var(--text-tertiary)] font-mono">days</span>
+              <span className="text-[11px] text-[var(--text-secondary)] font-mono">days</span>
             </div>
           </label>
           <label className="flex items-center justify-between">

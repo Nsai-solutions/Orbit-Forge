@@ -230,7 +230,7 @@ export default function PowerBudgetPanel() {
                 min="0"
                 max="20"
               />
-              <span className="text-[10px] text-[var(--text-tertiary)]">%/year</span>
+              <span className="text-[11px] text-[var(--text-secondary)]">%/yr</span>
             </div>
           </div>
           <button

@@ -53,7 +53,7 @@ export default function LifetimeConfigPanel() {
                 min="1.5"
                 max="3.5"
               />
-              <span className="text-[10px] text-[var(--text-tertiary)] font-mono">Cd</span>
+              <span className="text-[11px] text-[var(--text-secondary)] font-mono">Cd</span>
             </div>
           </label>
           <div className="flex items-center justify-between text-[10px]">
