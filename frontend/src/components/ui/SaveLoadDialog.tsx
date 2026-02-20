@@ -9,10 +9,38 @@ import {
   exportProjectJSON,
   importProjectJSON,
 } from '@/lib/persistence'
+import { generateMissionReport } from '@/lib/pdf-report'
 
 interface SaveLoadDialogProps {
   open: boolean
   onClose: () => void
+}
+
+function restoreProjectData(data: any) {
+  const state = useStore.getState()
+
+  if (data.elements) {
+    state.updateElements(data.elements)
+  }
+  if (data.mission) {
+    const mission = {
+      ...data.mission,
+      epoch: new Date(data.mission.epoch),
+    }
+    state.updateMission(mission)
+  }
+  if (data.groundStations) {
+    state.setGroundStations(data.groundStations)
+  }
+  if (data.subsystems) {
+    state.setSubsystems(data.subsystems)
+  }
+  if (data.degradationRate !== undefined) {
+    state.setDegradationRate(data.degradationRate)
+  }
+  if (data.walkerParams) {
+    state.setWalkerParams(data.walkerParams)
+  }
 }
 
 export default function SaveLoadDialog({ open, onClose }: SaveLoadDialogProps) {
@@ -22,8 +50,6 @@ export default function SaveLoadDialog({ open, onClose }: SaveLoadDialogProps) {
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const state = useStore.getState()
-  const updateElements = useStore((s) => s.updateElements)
-  const updateMission = useStore((s) => s.updateMission)
 
   const refreshProjects = () => setProjects(listProjects())
 
@@ -41,16 +67,7 @@ export default function SaveLoadDialog({ open, onClose }: SaveLoadDialogProps) {
       setStatus('Failed to load project')
       return
     }
-    if (project.data.elements) {
-      updateElements(project.data.elements)
-    }
-    if (project.data.mission) {
-      const mission = {
-        ...project.data.mission,
-        epoch: new Date(project.data.mission.epoch),
-      }
-      updateMission(mission)
-    }
+    restoreProjectData(project.data)
     setStatus(`Loaded "${name}"`)
     setTimeout(() => {
       setStatus('')
@@ -77,16 +94,7 @@ export default function SaveLoadDialog({ open, onClose }: SaveLoadDialogProps) {
     if (!file) return
     try {
       const project = await importProjectJSON(file)
-      if (project.data.elements) {
-        updateElements(project.data.elements)
-      }
-      if (project.data.mission) {
-        const mission = {
-          ...project.data.mission,
-          epoch: new Date(project.data.mission.epoch),
-        }
-        updateMission(mission)
-      }
+      restoreProjectData(project.data)
       setStatus(`Imported "${project.name}"`)
       setTimeout(() => {
         setStatus('')
@@ -95,7 +103,6 @@ export default function SaveLoadDialog({ open, onClose }: SaveLoadDialogProps) {
     } catch (err: any) {
       setStatus(`Error: ${err.message}`)
     }
-    // Reset file input
     e.target.value = ''
   }
 
@@ -137,6 +144,21 @@ export default function SaveLoadDialog({ open, onClose }: SaveLoadDialogProps) {
             className="flex-1 px-3 py-2 rounded-md border border-white/10 text-[var(--text-secondary)] text-xs font-sans hover:bg-white/5 transition-colors"
           >
             Import JSON
+          </button>
+          <button
+            onClick={async () => {
+              setStatus('Generating PDF...')
+              try {
+                await generateMissionReport(state)
+                setStatus('PDF exported')
+              } catch {
+                setStatus('PDF export failed')
+              }
+              setTimeout(() => setStatus(''), 2000)
+            }}
+            className="flex-1 px-3 py-2 rounded-md bg-accent-blue/10 border border-accent-blue/20 text-accent-blue text-xs font-sans font-semibold hover:bg-accent-blue/20 transition-colors"
+          >
+            Export PDF
           </button>
           <input
             ref={fileInputRef}

@@ -1,5 +1,5 @@
 const STORAGE_PREFIX = 'orbitforge-project-'
-const SCHEMA_VERSION = 1
+const SCHEMA_VERSION = 2
 
 interface SavedProject {
   version: number
@@ -9,6 +9,25 @@ interface SavedProject {
     elements: any
     groundStations: any
     mission: any
+    subsystems?: any
+    degradationRate?: number
+    walkerParams?: any
+  }
+}
+
+function serializeMissionState(state: any): SavedProject['data'] {
+  return {
+    elements: state.elements,
+    groundStations: state.groundStations,
+    mission: {
+      ...state.mission,
+      epoch: state.mission.epoch instanceof Date
+        ? state.mission.epoch.toISOString()
+        : state.mission.epoch,
+    },
+    subsystems: state.subsystems,
+    degradationRate: state.degradationRate,
+    walkerParams: state.walkerParams,
   }
 }
 
@@ -17,16 +36,7 @@ export function saveProject(name: string, state: any): void {
     version: SCHEMA_VERSION,
     name,
     savedAt: new Date().toISOString(),
-    data: {
-      elements: state.elements,
-      groundStations: state.groundStations,
-      mission: {
-        ...state.mission,
-        epoch: state.mission.epoch instanceof Date
-          ? state.mission.epoch.toISOString()
-          : state.mission.epoch,
-      },
-    },
+    data: serializeMissionState(state),
   }
   localStorage.setItem(STORAGE_PREFIX + name, JSON.stringify(project))
 }
@@ -70,16 +80,7 @@ export function exportProjectJSON(name: string, state: any): void {
     version: SCHEMA_VERSION,
     name,
     savedAt: new Date().toISOString(),
-    data: {
-      elements: state.elements,
-      groundStations: state.groundStations,
-      mission: {
-        ...state.mission,
-        epoch: state.mission.epoch instanceof Date
-          ? state.mission.epoch.toISOString()
-          : state.mission.epoch,
-      },
-    },
+    data: serializeMissionState(state),
   }
 
   const blob = new Blob([JSON.stringify(project, null, 2)], { type: 'application/json' })

@@ -3,6 +3,7 @@ import { useStore } from '@/stores'
 import DataReadout from '@/components/ui/DataReadout'
 import SectionHeader from '@/components/ui/SectionHeader'
 import { predictPasses, computePassMetrics } from '@/lib/pass-prediction'
+import LinkBudgetSection from './LinkBudgetSection'
 
 export default function PassDetailsDisplay() {
   const elements = useStore((s) => s.elements)
@@ -119,6 +120,8 @@ export default function PassDetailsDisplay() {
           />
         </div>
       </SectionHeader>
+
+      <LinkBudgetSection />
     </div>
   )
 }

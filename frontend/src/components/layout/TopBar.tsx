@@ -1,7 +1,9 @@
+import { useState } from 'react'
 import { useStore } from '@/stores'
 import { ModuleId, MODULE_LABELS, MODULE_NUMBERS } from '@/types'
 import UTCClock from '@/components/ui/UTCClock'
 import StatusIndicator from '@/components/ui/StatusIndicator'
+import { generateMissionReport } from '@/lib/pdf-report'
 
 const MODULES = Object.values(ModuleId)
 
@@ -12,6 +14,17 @@ interface TopBarProps {
 export default function TopBar({ onSaveLoad }: TopBarProps) {
   const activeModule = useStore((s) => s.activeModule)
   const setActiveModule = useStore((s) => s.setActiveModule)
+  const [reportStatus, setReportStatus] = useState<'idle' | 'generating'>('idle')
+
+  const handleReport = async () => {
+    setReportStatus('generating')
+    try {
+      await generateMissionReport(useStore.getState())
+    } catch {
+      // silent fail — user will see no file downloaded
+    }
+    setReportStatus('idle')
+  }
 
   return (
     <div className="h-12 bg-space-800/90 backdrop-blur-md border-b border-white/5 flex items-center px-4 gap-6 z-50">
@@ -55,6 +68,13 @@ export default function TopBar({ onSaveLoad }: TopBarProps) {
 
       {/* Right side */}
       <div className="flex items-center gap-4">
+        <button
+          onClick={handleReport}
+          disabled={reportStatus === 'generating'}
+          className="px-3 py-1 rounded text-[11px] font-sans text-[var(--text-secondary)] border border-white/10 hover:border-accent-blue/30 hover:text-accent-blue transition-all disabled:opacity-50"
+        >
+          {reportStatus === 'generating' ? 'Generating...' : 'Report'}
+        </button>
         {onSaveLoad && (
           <button
             onClick={onSaveLoad}

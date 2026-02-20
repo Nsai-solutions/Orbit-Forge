@@ -8,6 +8,7 @@ export interface PowerSlice {
   removeSubsystem: (id: string) => void
   updateSubsystem: (id: string, partial: Partial<PowerSubsystem>) => void
   setDegradationRate: (rate: number) => void
+  setSubsystems: (subs: PowerSubsystem[]) => void
   resetSubsystems: () => void
 }
 
@@ -29,6 +30,8 @@ export const createPowerSlice: StateCreator<PowerSlice, [], [], PowerSlice> = (s
     })),
 
   setDegradationRate: (rate) => set({ degradationRate: rate }),
+
+  setSubsystems: (subs) => set({ subsystems: subs }),
 
   resetSubsystems: () => set({ subsystems: [...DEFAULT_SUBSYSTEMS] }),
 })

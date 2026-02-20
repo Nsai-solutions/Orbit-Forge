@@ -4,6 +4,7 @@ import DataReadout from '@/components/ui/DataReadout'
 import MetricCard from '@/components/ui/MetricCard'
 import SectionHeader from '@/components/ui/SectionHeader'
 import { computePowerAnalysis } from '@/lib/power-budget'
+import ThermalSection from './ThermalSection'
 
 export default function PowerAnalysisDisplay() {
   const elements = useStore((s) => s.elements)
@@ -107,6 +108,8 @@ export default function PowerAnalysisDisplay() {
           />
         </div>
       </SectionHeader>
+
+      <ThermalSection />
     </div>
   )
 }

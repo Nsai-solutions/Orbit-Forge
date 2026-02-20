@@ -1,4 +1,4 @@
-import { useCallback } from 'react'
+import { useCallback, useState, useEffect } from 'react'
 
 interface SliderInputProps {
   label: string
@@ -23,6 +23,17 @@ export default function SliderInput({
   onChange,
   warning,
 }: SliderInputProps) {
+  // Local text state so user can type freely without reformatting mid-keystroke
+  const [localText, setLocalText] = useState(() => Number(value.toFixed(precision)).toString())
+  const [isFocused, setIsFocused] = useState(false)
+
+  // Sync local text when value changes externally (slider drag, preset, etc.)
+  useEffect(() => {
+    if (!isFocused) {
+      setLocalText(Number(value.toFixed(precision)).toString())
+    }
+  }, [value, precision, isFocused])
+
   const handleSliderChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       onChange(parseFloat(e.target.value))
@@ -30,14 +41,39 @@ export default function SliderInput({
     [onChange]
   )
 
-  const handleInputChange = useCallback(
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      const val = parseFloat(e.target.value)
+  const commitValue = useCallback(
+    (text: string) => {
+      const val = parseFloat(text)
       if (!isNaN(val)) {
         onChange(Math.min(max, Math.max(min, val)))
+      } else {
+        // Reset to current value if invalid
+        setLocalText(Number(value.toFixed(precision)).toString())
       }
     },
-    [onChange, min, max]
+    [onChange, min, max, value, precision]
+  )
+
+  const handleInputChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      setLocalText(e.target.value)
+    },
+    []
+  )
+
+  const handleBlur = useCallback(() => {
+    setIsFocused(false)
+    commitValue(localText)
+  }, [localText, commitValue])
+
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLInputElement>) => {
+      if (e.key === 'Enter') {
+        commitValue(localText)
+        ;(e.target as HTMLInputElement).blur()
+      }
+    },
+    [localText, commitValue]
   )
 
   // Compute fill percentage for styling
@@ -52,12 +88,15 @@ export default function SliderInput({
         <div className="flex items-center gap-1">
           <input
             type="number"
-            value={Number(value.toFixed(precision))}
+            value={localText}
             onChange={handleInputChange}
+            onFocus={() => setIsFocused(true)}
+            onBlur={handleBlur}
+            onKeyDown={handleKeyDown}
             min={min}
             max={max}
             step={step}
-            className="w-20 text-right bg-transparent border border-white/10 rounded px-2 py-0.5 text-xs font-mono text-accent-cyan focus:border-accent-blue focus:outline-none"
+            className="w-20 text-right bg-transparent border border-white/10 rounded px-2 py-0.5 text-xs font-mono text-accent-cyan focus:border-accent-blue focus:outline-none cursor-text"
           />
           {unit && (
             <span className="text-[10px] text-[var(--text-tertiary)] font-mono w-8">{unit}</span>

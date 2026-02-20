@@ -8,6 +8,7 @@ export interface GroundSlice {
   removeGroundStation: (id: string) => void
   updateGroundStation: (id: string, partial: Partial<GroundStation>) => void
   toggleStationActive: (id: string) => void
+  setGroundStations: (stations: GroundStation[]) => void
   resetGroundStations: () => void
 }
 
@@ -33,6 +34,8 @@ export const createGroundSlice: StateCreator<GroundSlice, [], [], GroundSlice> =
         gs.id === id ? { ...gs, active: !gs.active } : gs
       ),
     })),
+
+  setGroundStations: (stations) => set({ groundStations: stations }),
 
   resetGroundStations: () => set({ groundStations: DEFAULT_GROUND_STATIONS }),
 })

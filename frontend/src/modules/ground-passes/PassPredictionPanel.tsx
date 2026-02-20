@@ -2,7 +2,9 @@ import { useState, useMemo } from 'react'
 import { useStore } from '@/stores'
 import SectionHeader from '@/components/ui/SectionHeader'
 import MetricCard from '@/components/ui/MetricCard'
+import ExportCSVButton from '@/components/ui/ExportCSVButton'
 import { predictPasses, computePassMetrics } from '@/lib/pass-prediction'
+import { exportCSV } from '@/lib/csv-export'
 
 export default function PassPredictionPanel() {
   const elements = useStore((s) => s.elements)
@@ -33,15 +35,18 @@ export default function PassPredictionPanel() {
       <SectionHeader title="Prediction Settings">
         <div className="space-y-2">
           <label className="flex items-center justify-between">
-            <span className="text-[10px] text-[var(--text-secondary)]">Duration (days)</span>
-            <input
-              type="number"
-              value={durationDays}
-              onChange={(e) => setDurationDays(Math.max(1, Math.min(14, parseInt(e.target.value) || 1)))}
-              className="input-field w-16 text-xs text-center"
-              min="1"
-              max="14"
-            />
+            <span className="text-[10px] text-[var(--text-secondary)]">Duration</span>
+            <div className="flex items-center gap-1.5">
+              <input
+                type="number"
+                value={durationDays}
+                onChange={(e) => setDurationDays(Math.max(1, Math.min(14, parseInt(e.target.value) || 1)))}
+                className="input-field w-16 text-xs text-center"
+                min="1"
+                max="14"
+              />
+              <span className="text-[10px] text-[var(--text-tertiary)] font-mono">days</span>
+            </div>
           </label>
           <label className="flex items-center justify-between">
             <span className="text-[10px] text-[var(--text-secondary)]">Min Quality</span>
@@ -87,7 +92,24 @@ export default function PassPredictionPanel() {
         </div>
       </SectionHeader>
 
-      <SectionHeader title={`Passes (${filteredPasses.length})`}>
+      <SectionHeader title={`Passes (${filteredPasses.length})`} actions={
+        <ExportCSVButton onClick={() => {
+          exportCSV(
+            `${mission.name.replace(/\s+/g, '_')}_passes_${durationDays}d`,
+            ['Station', 'AOS (UTC)', 'LOS (UTC)', 'Duration (min)', 'Max Elevation (deg)', 'AOS Azimuth (deg)', 'LOS Azimuth (deg)', 'Quality'],
+            filteredPasses.map(p => [
+              p.station,
+              p.aos.toISOString(),
+              p.los.toISOString(),
+              (p.durationSec / 60).toFixed(1),
+              p.maxElevation.toFixed(1),
+              p.aosAzimuth.toFixed(1),
+              p.losAzimuth.toFixed(1),
+              p.quality,
+            ])
+          )
+        }} />
+      }>
         <div className="space-y-1 max-h-64 overflow-y-auto">
           {filteredPasses.length === 0 ? (
             <div className="text-[var(--text-tertiary)] text-xs font-mono text-center py-4">

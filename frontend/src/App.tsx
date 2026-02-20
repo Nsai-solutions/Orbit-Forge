@@ -13,10 +13,10 @@ import OrbitalParamsDisplay from '@/modules/orbit-design/OrbitalParamsDisplay'
 import GroundTrackPlot from '@/modules/orbit-design/GroundTrackPlot'
 import PowerBudgetPanel from '@/modules/power-budget/PowerBudgetPanel'
 import PowerAnalysisDisplay from '@/modules/power-budget/PowerAnalysisDisplay'
-import PowerChart from '@/modules/power-budget/PowerChart'
+import PowerBottomPanel from '@/modules/power-budget/PowerBottomPanel'
 import PassPredictionPanel from '@/modules/ground-passes/PassPredictionPanel'
 import PassDetailsDisplay from '@/modules/ground-passes/PassDetailsDisplay'
-import PassTimelineChart from '@/modules/ground-passes/PassTimelineChart'
+import PassBottomPanel from '@/modules/ground-passes/PassBottomPanel'
 import LifetimeConfigPanel from '@/modules/orbital-lifetime/LifetimeConfigPanel'
 import LifetimeDisplay from '@/modules/orbital-lifetime/LifetimeDisplay'
 import DecayCurveChart from '@/modules/orbital-lifetime/DecayCurveChart'
@@ -79,9 +79,9 @@ function BottomPanelContent() {
     case ModuleId.MissionConfig:
       return <GroundTrackPlot />
     case ModuleId.PowerBudget:
-      return <PowerChart />
+      return <PowerBottomPanel />
     case ModuleId.GroundPasses:
-      return <PassTimelineChart />
+      return <PassBottomPanel />
     case ModuleId.OrbitalLifetime:
       return <DecayCurveChart />
     case ModuleId.Constellation:

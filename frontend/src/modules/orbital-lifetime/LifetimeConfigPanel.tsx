@@ -43,15 +43,18 @@ export default function LifetimeConfigPanel() {
           </label>
           <label className="flex items-center justify-between">
             <span className="text-[10px] text-[var(--text-secondary)]">Drag Coeff (Cd)</span>
-            <input
-              type="number"
-              value={dragCoeff}
-              onChange={(e) => setDragCoeff(parseFloat(e.target.value) || 2.2)}
-              className="input-field w-16 text-xs text-center"
-              step="0.1"
-              min="1.5"
-              max="3.5"
-            />
+            <div className="flex items-center gap-1.5">
+              <input
+                type="number"
+                value={dragCoeff}
+                onChange={(e) => setDragCoeff(parseFloat(e.target.value) || 2.2)}
+                className="input-field w-16 text-xs text-center"
+                step="0.1"
+                min="1.5"
+                max="3.5"
+              />
+              <span className="text-[10px] text-[var(--text-tertiary)] font-mono">Cd</span>
+            </div>
           </label>
           <div className="flex items-center justify-between text-[10px]">
             <span className="text-[var(--text-tertiary)]">Cross-section</span>

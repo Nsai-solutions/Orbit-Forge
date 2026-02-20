@@ -12,6 +12,8 @@ import {
 } from '@/lib/units'
 import DataReadout from '@/components/ui/DataReadout'
 import SectionHeader from '@/components/ui/SectionHeader'
+import ExportCSVButton from '@/components/ui/ExportCSVButton'
+import { exportCSV } from '@/lib/csv-export'
 
 export default function OrbitalParamsDisplay() {
   const derivedParams = useStore((s) => s.derivedParams)
@@ -56,7 +58,31 @@ export default function OrbitalParamsDisplay() {
       </div>
 
       {/* Key Parameters */}
-      <SectionHeader title="Orbital Parameters" defaultOpen={true}>
+      <SectionHeader title="Orbital Parameters" defaultOpen={true} actions={
+        <ExportCSVButton onClick={() => {
+          if (!derivedParams) return
+          exportCSV(
+            'orbital_parameters',
+            ['Parameter', 'Value', 'Unit'],
+            [
+              ['Semi-major Axis', elements.semiMajorAxis.toFixed(3), 'km'],
+              ['Eccentricity', elements.eccentricity.toFixed(6), ''],
+              ['Inclination', elements.inclination.toFixed(4), 'deg'],
+              ['RAAN', elements.raan.toFixed(4), 'deg'],
+              ['Arg of Perigee', elements.argOfPerigee.toFixed(4), 'deg'],
+              ['True Anomaly', elements.trueAnomaly.toFixed(4), 'deg'],
+              ['Period', (derivedParams.period / 60).toFixed(2), 'min'],
+              ['Perigee Altitude', derivedParams.periapsisAlt.toFixed(1), 'km'],
+              ['Apogee Altitude', derivedParams.apoapsisAlt.toFixed(1), 'km'],
+              ['V Perigee', derivedParams.velocityPerigee.toFixed(3), 'km/s'],
+              ['V Apogee', derivedParams.velocityApogee.toFixed(3), 'km/s'],
+              ['RAAN Drift', derivedParams.raanDrift.toFixed(4), 'deg/day'],
+              ['Revs/Day', derivedParams.revsPerDay.toFixed(2), ''],
+              ['Eclipse Fraction', (derivedParams.eclipseFraction * 100).toFixed(1), '%'],
+            ]
+          )
+        }} />
+      }>
         <div className="grid grid-cols-2 gap-2">
           <DataReadout label="Period" value={formatPeriodMinutes(derivedParams.period)} />
           <DataReadout label="Revs/Day" value={formatRevsPerDay(derivedParams.revsPerDay)} />

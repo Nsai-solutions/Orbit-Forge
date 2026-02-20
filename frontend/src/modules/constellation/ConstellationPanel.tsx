@@ -3,12 +3,15 @@ import { useStore } from '@/stores'
 import SectionHeader from '@/components/ui/SectionHeader'
 import MetricCard from '@/components/ui/MetricCard'
 import SliderInput from '@/components/ui/SliderInput'
+import ExportCSVButton from '@/components/ui/ExportCSVButton'
 import {
   DEFAULT_WALKER,
+  generateWalkerConstellation,
   computeConstellationMetrics,
   type WalkerParams,
   type WalkerType,
 } from '@/lib/constellation'
+import { exportCSV } from '@/lib/csv-export'
 
 export default function ConstellationPanel() {
   const mission = useStore((s) => s.mission)
@@ -88,7 +91,7 @@ export default function ConstellationPanel() {
             min={0}
             max={180}
             step={0.1}
-            unit="deg"
+            unit={"\u00B0"}
           />
         </div>
       </SectionHeader>
@@ -107,7 +110,24 @@ export default function ConstellationPanel() {
         </div>
       </SectionHeader>
 
-      <SectionHeader title="Constellation Metrics">
+      <SectionHeader title="Constellation Metrics" actions={
+        <ExportCSVButton onClick={() => {
+          const sats = generateWalkerConstellation(params)
+          exportCSV(
+            `${mission.name.replace(/\s+/g, '_')}_constellation`,
+            ['Sat ID', 'Plane', 'Index', 'SMA (km)', 'Ecc', 'Inc (deg)', 'RAAN (deg)', 'AoP (deg)', 'True Anomaly (deg)'],
+            sats.map(s => [
+              s.id + 1, s.plane + 1, s.indexInPlane + 1,
+              s.elements.semiMajorAxis.toFixed(3),
+              s.elements.eccentricity.toFixed(6),
+              s.elements.inclination.toFixed(4),
+              s.elements.raan.toFixed(4),
+              s.elements.argOfPerigee.toFixed(4),
+              s.elements.trueAnomaly.toFixed(4),
+            ])
+          )
+        }} />
+      }>
         <div className="grid grid-cols-2 gap-2">
           <MetricCard
             label="Total Sats"

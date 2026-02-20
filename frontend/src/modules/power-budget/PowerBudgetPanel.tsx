@@ -1,7 +1,9 @@
 import { useState } from 'react'
 import { useStore } from '@/stores'
 import SectionHeader from '@/components/ui/SectionHeader'
+import ExportCSVButton from '@/components/ui/ExportCSVButton'
 import { subsystemAvgPower, totalAvgPowerDraw } from '@/lib/power-budget'
+import { exportCSV } from '@/lib/csv-export'
 
 export default function PowerBudgetPanel() {
   const subsystems = useStore((s) => s.subsystems)
@@ -17,7 +19,21 @@ export default function PowerBudgetPanel() {
   const [newPower, setNewPower] = useState(1)
   const [newDuty, setNewDuty] = useState(100)
 
+  const mission = useStore((s) => s.mission)
   const totalAvg = totalAvgPowerDraw(subsystems)
+
+  const handleExportCSV = () => {
+    exportCSV(
+      `${mission.name.replace(/\s+/g, '_')}_power_budget`,
+      ['Name', 'Mode', 'Power (W)', 'Duty Cycle (%)', 'Avg Power (W)', 'Eclipse Only'],
+      subsystems.map(s => [
+        s.name, s.mode, s.powerW,
+        (Math.min(1, Math.max(0, s.dutyCycle)) * 100).toFixed(1),
+        subsystemAvgPower(s).toFixed(2),
+        s.isEclipseOnly ? 'Yes' : 'No',
+      ])
+    )
+  }
 
   const handleAdd = () => {
     if (!newName.trim()) return
@@ -55,7 +71,7 @@ export default function PowerBudgetPanel() {
             return (
               <div
                 key={sub.id}
-                className="rounded-md border border-white/5 bg-white/[0.03] px-3 py-2 group"
+                className="rounded-md border border-white/5 bg-white/[0.03] px-2 py-2 group overflow-hidden"
               >
                 {/* Header row: name, mode, delete */}
                 <div className="flex items-center justify-between mb-2">
@@ -76,9 +92,9 @@ export default function PowerBudgetPanel() {
                 </div>
 
                 {/* Input row */}
-                <div className="flex items-end gap-3">
+                <div className="flex items-end gap-2">
                   {/* Power input */}
-                  <div className="flex-1">
+                  <div className="flex-1 min-w-0">
                     <label className="text-[9px] uppercase tracking-wider text-[var(--text-secondary)] block mb-1">
                       Power (W)
                     </label>
@@ -86,14 +102,14 @@ export default function PowerBudgetPanel() {
                       type="number"
                       value={sub.powerW}
                       onChange={(e) => handlePowerChange(sub.id, parseFloat(e.target.value) || 0)}
-                      className="w-full min-w-[60px] rounded border border-white/10 bg-white/[0.06] px-2 py-1 text-xs font-mono text-[var(--text-primary)] text-center focus:border-accent-blue focus:outline-none"
+                      className="w-full rounded border border-white/10 bg-white/[0.06] px-1.5 py-1 text-xs font-mono text-[var(--text-primary)] text-center focus:border-accent-blue focus:outline-none"
                       step="0.1"
                       min="0"
                     />
                   </div>
 
                   {/* Duty cycle input */}
-                  <div className="flex-1">
+                  <div className="flex-1 min-w-0">
                     <label className="text-[9px] uppercase tracking-wider text-[var(--text-secondary)] block mb-1">
                       Duty (%)
                     </label>
@@ -101,18 +117,18 @@ export default function PowerBudgetPanel() {
                       type="number"
                       value={dutyPercent}
                       onChange={(e) => handleDutyChange(sub.id, parseFloat(e.target.value) || 0)}
-                      className="w-full min-w-[60px] rounded border border-white/10 bg-white/[0.06] px-2 py-1 text-xs font-mono text-[var(--text-primary)] text-center focus:border-accent-blue focus:outline-none"
+                      className="w-full rounded border border-white/10 bg-white/[0.06] px-1.5 py-1 text-xs font-mono text-[var(--text-primary)] text-center focus:border-accent-blue focus:outline-none"
                       min="0"
                       max="100"
                     />
                   </div>
 
                   {/* Average result */}
-                  <div className="flex-1 text-right">
+                  <div className="shrink-0 text-right pl-1">
                     <label className="text-[9px] uppercase tracking-wider text-[var(--text-tertiary)] block mb-1">
                       Avg
                     </label>
-                    <div className="text-xs font-mono font-bold text-accent-cyan py-1">
+                    <div className="text-xs font-mono font-bold text-accent-cyan py-1 whitespace-nowrap">
                       {avgW.toFixed(2)} W
                     </div>
                   </div>
@@ -122,14 +138,17 @@ export default function PowerBudgetPanel() {
           })}
         </div>
 
-        {/* Total */}
+        {/* Total + Export */}
         <div className="flex items-center justify-between px-3 py-2.5 border-t border-white/10 mt-3">
           <span className="text-[10px] uppercase tracking-wider text-[var(--text-secondary)] font-mono font-semibold">
             Total Avg Draw
           </span>
-          <span className="text-sm font-mono font-bold text-accent-cyan">
-            {totalAvg.toFixed(2)} W
-          </span>
+          <div className="flex items-center gap-3">
+            <ExportCSVButton onClick={handleExportCSV} />
+            <span className="text-sm font-mono font-bold text-accent-cyan">
+              {totalAvg.toFixed(2)} W
+            </span>
+          </div>
         </div>
       </SectionHeader>
 
