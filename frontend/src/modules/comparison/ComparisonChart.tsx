@@ -9,12 +9,12 @@ export default function ComparisonChart() {
     paper_bgcolor: 'transparent',
     plot_bgcolor: 'transparent',
     font: { family: 'JetBrains Mono', size: 10, color: '#9CA3AF' },
-    margin: { l: 50, r: 50, t: 30, b: 60 },
+    margin: { l: 50, r: 50, t: 40, b: 60 },
     legend: {
       font: { size: 9, color: '#9CA3AF' },
       bgcolor: 'transparent',
       orientation: 'h' as const,
-      y: 1.12,
+      y: 1.15,
     },
   }
 
@@ -36,8 +36,11 @@ export default function ComparisonChart() {
     name: sc.name,
     marker: { color: barColors[i % barColors.length] },
     text: metricDefs.map((m) => m.transform((sc.metrics as any)[m.key]).toFixed(1)),
-    textposition: 'outside',
-    textfont: { size: 8, color: '#9CA3AF' },
+    textposition: 'inside',
+    insidetextanchor: 'end',
+    textfont: { size: 9, color: '#F9FAFB' },
+    constraintext: 'none',
+    hovertemplate: '%{x}: %{y:.1f}<extra>%{fullData.name}</extra>',
   }))
 
   // Lifetime comparison bar
@@ -48,9 +51,12 @@ export default function ComparisonChart() {
     name: sc.name,
     marker: { color: barColors[i % barColors.length] },
     text: [`${(sc.metrics.lifetimeDays / 365.25).toFixed(1)} yr`],
-    textposition: 'outside',
-    textfont: { size: 9, color: '#9CA3AF' },
+    textposition: 'inside',
+    insidetextanchor: 'end',
+    textfont: { size: 10, color: '#F9FAFB' },
+    constraintext: 'none',
     showlegend: false,
+    hovertemplate: '%{x}: %{y:.1f} yr<extra></extra>',
   }))
 
   if (scenarios.length === 0) {
@@ -60,6 +66,16 @@ export default function ComparisonChart() {
       </div>
     )
   }
+
+  // Compute y-axis max with headroom so bars don't touch the top
+  const allValues = scenarios.flatMap((sc) =>
+    metricDefs.map((m) => m.transform((sc.metrics as any)[m.key]))
+  )
+  const maxVal = Math.max(...allValues, 1)
+  const yMax = maxVal * 1.15
+
+  const allLifetimes = scenarios.map((sc) => sc.metrics.lifetimeDays / 365.25)
+  const lifetimeMax = Math.max(...allLifetimes, 1) * 1.15
 
   return (
     <div className="flex h-full gap-2">
@@ -79,6 +95,7 @@ export default function ComparisonChart() {
               title: { text: 'Value', font: { size: 9 } },
               gridcolor: 'rgba(255,255,255,0.05)',
               color: '#6B7280',
+              range: [0, yMax],
             },
           }}
           config={{ displayModeBar: false, responsive: true }}
@@ -101,7 +118,7 @@ export default function ComparisonChart() {
               title: { text: 'Lifetime (years)', font: { size: 9 } },
               gridcolor: 'rgba(255,255,255,0.05)',
               color: '#6B7280',
-              rangemode: 'tozero',
+              range: [0, lifetimeMax],
             },
             showlegend: false,
           }}
