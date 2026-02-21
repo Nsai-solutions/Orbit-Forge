@@ -209,7 +209,7 @@ export interface PhasedTrajectory {
 
 /**
  * Generate flyby trajectory with phase-segmented output for color-coded rendering.
- * Uses LUNAR_SCENE_SCALE so coordinates match LunarScene.tsx exactly.
+ * Uses LUNAR_SCENE_SCALE for positions; original parametric shape for correct deflection.
  */
 export function generateFlybyPath(
   departureAltKm: number,
@@ -218,64 +218,67 @@ export function generateFlybyPath(
 ): PhasedTrajectory {
   const rPark = (R_EARTH_EQUATORIAL + departureAltKm) / LUNAR_SCENE_SCALE
   const moonX = MOON_SEMI_MAJOR_AXIS / LUNAR_SCENE_SCALE
-  // Exaggerate flyby distance for visibility (physical scale ~0.005 is invisible)
-  const flybyVisualR = 0.04
+  const flybyR = (R_MOON + closestApproachKm) / LUNAR_SCENE_SCALE
 
   const approach: Vec3[] = []
   const nearMoon: Vec3[] = []
   const departure: Vec3[] = []
 
-  // Phase 1: Inbound transfer arc (Earth → Moon vicinity)
-  const inboundN = Math.floor(numPoints * 0.5)
-  const arcHeight = moonX * 0.15
+  // Phase 1: Inbound transfer arc — parametric elliptical shape
+  // Approach ends offset from Moon so the near-Moon deflection angle is non-zero
+  const inboundN = Math.floor(numPoints * 0.6)
   for (let i = 0; i <= inboundN; i++) {
     const t = i / inboundN
-    const x = rPark + t * (moonX - rPark)
-    const z = arcHeight * 4 * t * (1 - t)
-    approach.push({ x, y: 0, z })
+    const theta = t * Math.PI * 0.95
+    const r = rPark + (moonX - rPark) * (1 - Math.cos(theta)) / 2
+    approach.push({
+      x: r * Math.cos(theta * 0.6),
+      y: 0,
+      z: -r * Math.sin(theta * 0.6),
+    })
   }
 
-  // Phase 2: Hyperbolic flyby around Moon
-  const flybyN = Math.floor(numPoints * 0.25)
-  const approachEnd = approach[approach.length - 1]
-  nearMoon.push({ ...approachEnd })
-  const startAngle = Math.atan2(approachEnd.z, approachEnd.x - moonX)
-  const sweepAngle = Math.PI * 1.2
+  // Phase 2: Hyperbolic flyby — smooth deflection ~60° past Moon
+  const flybyN = Math.floor(numPoints * 0.2)
+  const lastInbound = approach[approach.length - 1]
+  nearMoon.push({ ...lastInbound })
+  const approachAngle = Math.atan2(lastInbound.z, lastInbound.x - moonX)
+  const deflectionAngle = Math.PI * 0.6
 
   let closestApproach: Vec3 | null = null
   let minDist = Infinity
 
   for (let i = 1; i <= flybyN; i++) {
     const t = i / flybyN
-    const angle = startAngle - t * sweepAngle
-    const periProgress = Math.sin(t * Math.PI)
-    const dist = flybyVisualR * 2.5 - flybyVisualR * 1.5 * periProgress
+    const angle = approachAngle + t * deflectionAngle
+    const distFromMoon = flybyR + flybyR * 2 * Math.pow(Math.abs(t - 0.5) * 2, 1.5)
     const pt: Vec3 = {
-      x: moonX + dist * Math.cos(angle),
+      x: moonX + distFromMoon * Math.cos(angle),
       y: 0,
-      z: dist * Math.sin(angle),
+      z: distFromMoon * Math.sin(angle),
     }
     nearMoon.push(pt)
-    if (dist < minDist) {
-      minDist = dist
+    if (distFromMoon < minDist) {
+      minDist = distFromMoon
       closestApproach = { ...pt }
     }
   }
 
-  // Phase 3: Outgoing departure past Moon
+  // Phase 3: Outgoing leg — continuing past Moon away from Earth
   const outN = numPoints - inboundN - flybyN
   const lastFlyby = nearMoon[nearMoon.length - 1]
   departure.push({ ...lastFlyby })
-  const departAngle = Math.atan2(lastFlyby.z, lastFlyby.x - moonX)
+  const outAngle = Math.atan2(lastFlyby.z, lastFlyby.x - moonX)
+  const outSpeed = 0.012
 
   for (let i = 1; i <= outN; i++) {
     const t = i / outN
-    const angle = departAngle + t * 0.3
-    const dist = flybyVisualR * 2 + t * 0.25
+    const curveAngle = outAngle + t * 0.3
+    const dist = t * outSpeed * outN
     departure.push({
-      x: moonX + dist * Math.cos(angle),
+      x: lastFlyby.x + dist * Math.cos(curveAngle),
       y: 0,
-      z: dist * Math.sin(angle),
+      z: lastFlyby.z + dist * Math.sin(curveAngle),
     })
   }
 
@@ -284,7 +287,7 @@ export function generateFlybyPath(
 
 /**
  * Generate free-return figure-8 trajectory with phase-segmented output.
- * Uses LUNAR_SCENE_SCALE so coordinates match LunarScene.tsx exactly.
+ * Uses LUNAR_SCENE_SCALE for positions; original parametric shape for correct figure-8.
  */
 export function generateFreeReturnTrajectory(
   departureAltKm: number,
@@ -292,37 +295,40 @@ export function generateFreeReturnTrajectory(
 ): PhasedTrajectory {
   const rPark = (R_EARTH_EQUATORIAL + departureAltKm) / LUNAR_SCENE_SCALE
   const moonX = MOON_SEMI_MAJOR_AXIS / LUNAR_SCENE_SCALE
-  const swingVisualR = 0.03
+  const swingbyR = (R_MOON + 150) / LUNAR_SCENE_SCALE
 
   const approach: Vec3[] = []
   const nearMoon: Vec3[] = []
   const departure: Vec3[] = []
 
-  // Phase 1: Outbound leg (Earth → Moon)
+  // Phase 1: Outbound leg (Earth → Moon) — parametric elliptical shape
   const outboundN = Math.floor(numPoints * 0.35)
-  const arcHeight = moonX * 0.12
   for (let i = 0; i <= outboundN; i++) {
     const t = i / outboundN
-    const x = rPark + t * (moonX - rPark)
-    const z = arcHeight * 4 * t * (1 - t)
-    approach.push({ x, y: 0, z })
+    const theta = t * Math.PI * 0.85
+    const r = rPark + (moonX - rPark) * (1 - Math.cos(theta)) / 2
+    approach.push({
+      x: r * Math.cos(theta * 0.55),
+      y: 0,
+      z: r * Math.sin(theta * 0.55) * 0.35,
+    })
   }
 
   // Phase 2: Swing-by around the far side of the Moon
   const swingN = Math.floor(numPoints * 0.15)
-  const swingStart = approach[approach.length - 1]
-  nearMoon.push({ ...swingStart })
-  const startAngle = Math.atan2(swingStart.z, swingStart.x - moonX)
-  const sweepAngle = Math.PI * 1.5
+  const swingStartAngle = Math.PI * 0.35
+  const swingEndAngle = -Math.PI * 0.35
+
+  nearMoon.push({ ...approach[approach.length - 1] })
 
   let closestApproach: Vec3 | null = null
   let minDist = Infinity
 
   for (let i = 1; i <= swingN; i++) {
     const t = i / swingN
-    const angle = startAngle - t * sweepAngle
+    const angle = swingStartAngle - t * (swingStartAngle - swingEndAngle + Math.PI)
     const periProgress = Math.sin(t * Math.PI)
-    const dist = swingVisualR * 3 - swingVisualR * 2 * periProgress
+    const dist = swingbyR * 3 - swingbyR * 2 * periProgress
     const pt: Vec3 = {
       x: moonX + dist * Math.cos(angle),
       y: 0,
@@ -340,17 +346,22 @@ export function generateFreeReturnTrajectory(
   const lastSwing = nearMoon[nearMoon.length - 1]
   departure.push({ ...lastSwing })
 
-  const earthX = 0.02
-  const earthZ = -0.01
-  const cp1x = lastSwing.x * 0.65
-  const cp1z = lastSwing.z - 0.2
-  const cp2x = 0.3
-  const cp2z = -0.15
-
   for (let i = 1; i <= returnN; i++) {
     const t = i / returnN
-    const u = t, u2 = u * u, u3 = u2 * u
-    const mt = 1 - u, mt2 = mt * mt, mt3 = mt2 * mt
+    const earthX = 0.02
+    const earthZ = -0.01
+
+    const cp1x = lastSwing.x - 0.15
+    const cp1z = lastSwing.z - 0.25
+    const cp2x = 0.3
+    const cp2z = -0.2
+
+    const u = t
+    const u2 = u * u
+    const u3 = u2 * u
+    const mt = 1 - u
+    const mt2 = mt * mt
+    const mt3 = mt2 * mt
 
     departure.push({
       x: mt3 * lastSwing.x + 3 * mt2 * u * cp1x + 3 * mt * u2 * cp2x + u3 * earthX,
