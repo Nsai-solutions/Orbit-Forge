@@ -9,8 +9,10 @@ import { ConstellationSlice, createConstellationSlice } from './constellation-sl
 import { DeltaVSlice, createDeltaVSlice } from './deltav-slice'
 import { RadiationSlice, createRadiationSlice } from './radiation-slice'
 import { ComparisonSlice, createComparisonSlice } from './comparison-slice'
+import { PayloadSlice, createPayloadSlice } from './payload-slice'
+import { BeyondLeoSlice, createBeyondLeoSlice } from './beyond-leo-slice'
 
-export type AppStore = UISlice & MissionSlice & OrbitSlice & GroundSlice & PowerSlice & ConstellationSlice & DeltaVSlice & RadiationSlice & ComparisonSlice
+export type AppStore = UISlice & MissionSlice & OrbitSlice & GroundSlice & PowerSlice & ConstellationSlice & DeltaVSlice & RadiationSlice & ComparisonSlice & PayloadSlice & BeyondLeoSlice
 
 export const useStore = create<AppStore>()(
   devtools(
@@ -25,10 +27,12 @@ export const useStore = create<AppStore>()(
         ...createDeltaVSlice(...a),
         ...createRadiationSlice(...a),
         ...createComparisonSlice(...a),
+        ...createPayloadSlice(...a),
+        ...createBeyondLeoSlice(...a),
       }),
       {
         name: 'orbitforge-autosave',
-        version: 10,
+        version: 12,
         migrate: (persisted: any, version: number) => {
           if (version < 8) {
             const { groundStations, ...rest } = persisted || {}
@@ -87,6 +91,12 @@ export const useStore = create<AppStore>()(
           maneuvers: state.maneuvers,
           shieldingThicknessMm: state.shieldingThicknessMm,
           scenarios: state.scenarios,
+          payloadType: state.payloadType,
+          payloadShared: state.payloadShared,
+          payloadEO: state.payloadEO,
+          payloadSAR: state.payloadSAR,
+          payloadSATCOM: state.payloadSATCOM,
+          beyondLeo: state.beyondLeo,
           mission: {
             ...state.mission,
             epoch: state.mission.epoch instanceof Date

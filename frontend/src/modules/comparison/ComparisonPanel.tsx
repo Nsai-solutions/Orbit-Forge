@@ -8,7 +8,10 @@ import { computeRadiationEnvironment } from '@/lib/radiation'
 import { computeDerivedParams } from '@/lib/orbital-mechanics'
 import { predictPasses, computePassMetrics } from '@/lib/pass-prediction'
 import { R_EARTH_EQUATORIAL } from '@/lib/constants'
-import type { ScenarioMetrics, Scenario } from '@/stores/comparison-slice'
+import { computeLagrangeResult } from '@/lib/lagrange'
+import { computeLunarResult } from '@/lib/lunar-transfer'
+import { computeInterplanetaryResult } from '@/lib/interplanetary'
+import type { ScenarioMetrics, Scenario, BeyondLeoSummary } from '@/stores/comparison-slice'
 
 export default function ComparisonPanel() {
   const [scenarioName, setScenarioName] = useState('')
@@ -71,6 +74,24 @@ export default function ComparisonPanel() {
       coldCaseC: 0,
     }
 
+    // Beyond-LEO summary (optional)
+    let beyondLeoSummary: BeyondLeoSummary | undefined
+    const beyondLeo = useStore.getState().beyondLeo
+    if (beyondLeo) {
+      try {
+        if (beyondLeo.mode === 'lagrange') {
+          const lr = computeLagrangeResult(beyondLeo.lagrangeParams)
+          beyondLeoSummary = { mode: 'lagrange', totalDeltaVms: lr.totalDeltaVms, transferTimeDays: lr.transferTimeDays }
+        } else if (beyondLeo.mode === 'lunar') {
+          const lnr = computeLunarResult(beyondLeo.lunarParams)
+          beyondLeoSummary = { mode: 'lunar', totalDeltaVms: lnr.totalDeltaVms, transferTimeDays: lnr.transferTimeDays }
+        } else {
+          const ir = computeInterplanetaryResult(beyondLeo.interplanetaryParams)
+          beyondLeoSummary = { mode: 'interplanetary', totalDeltaVms: ir.totalDeltaVms, transferTimeDays: ir.transferTimeDays }
+        }
+      } catch { /* ignore if beyond-leo not configured */ }
+    }
+
     const scenario: Scenario = {
       id: `sc-${Date.now()}`,
       name,
@@ -83,6 +104,7 @@ export default function ComparisonPanel() {
       propulsion: { ...propulsion },
       shieldingMm,
       metrics,
+      beyondLeoSummary,
     }
 
     addScenario(scenario)

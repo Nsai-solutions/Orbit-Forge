@@ -33,3 +33,5 @@ frontend/public/textures/*.png
 # Logs
 *.log
 npm-debug.log*
+
+.vercel

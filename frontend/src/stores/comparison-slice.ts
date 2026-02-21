@@ -2,6 +2,7 @@ import { StateCreator } from 'zustand'
 import type { MissionConfig } from '@/types/mission'
 import type { OrbitalElements } from '@/types/orbit'
 import type { PropulsionConfig } from '@/types/propulsion'
+import type { BeyondLeoMode } from '@/types/beyond-leo'
 
 export interface ScenarioMetrics {
   periodMin: number
@@ -21,6 +22,12 @@ export interface ScenarioMetrics {
   coldCaseC: number
 }
 
+export interface BeyondLeoSummary {
+  mode: BeyondLeoMode
+  totalDeltaVms: number
+  transferTimeDays: number
+}
+
 export interface Scenario {
   id: string
   name: string
@@ -30,6 +37,7 @@ export interface Scenario {
   propulsion: PropulsionConfig
   shieldingMm: number
   metrics: ScenarioMetrics
+  beyondLeoSummary?: BeyondLeoSummary
 }
 
 export interface ComparisonSlice {

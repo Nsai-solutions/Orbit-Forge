@@ -143,6 +143,8 @@ export function geodeticToThreeJS(lat: number, lon: number, radius = 1): Vec3 {
  * Convert ECI position to Three.js coordinates (unit: Earth radii)
  * ECI: x=vernal equinox, y=90deg east, z=north pole
  * Three.js: x=right, y=up, z=toward camera
+ * NOTE: This produces ECI-aligned positions. For Earth-fixed rendering,
+ * use eciToEcefThreeJS instead.
  */
 export function eciToThreeJS(eci: Vec3, earthRadii = true): Vec3 {
   const scale = earthRadii ? 1 / R_EARTH_EQUATORIAL : 1
@@ -150,5 +152,20 @@ export function eciToThreeJS(eci: Vec3, earthRadii = true): Vec3 {
     x: eci.x * scale,
     y: eci.z * scale,
     z: -eci.y * scale,
+  }
+}
+
+/**
+ * Convert ECI position to ECEF-aligned Three.js coordinates.
+ * Applies GMST rotation so the result is consistent with the Earth globe
+ * texture, ground stations, and ground tracks (all in ECEF frame).
+ */
+export function eciToEcefThreeJS(eci: Vec3, gmst: number): Vec3 {
+  const ecef = eciToEcef(eci, gmst)
+  const scale = 1 / R_EARTH_EQUATORIAL
+  return {
+    x: ecef.x * scale,
+    y: ecef.z * scale,
+    z: -ecef.y * scale,
   }
 }

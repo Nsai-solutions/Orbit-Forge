@@ -100,6 +100,17 @@ export default function ComparisonDisplay() {
                   })}
                 </tr>
               ))}
+              {/* Beyond-LEO row — only show if any scenario has it */}
+              {scenarios.some((sc) => sc.beyondLeoSummary) && (
+                <tr className="border-b border-white/5 hover:bg-white/[0.02]">
+                  <td className="py-1.5 px-1 text-[var(--text-secondary)]">Beyond-LEO ΔV</td>
+                  {scenarios.map((sc) => (
+                    <td key={sc.id} className="py-1.5 px-1 text-right font-mono text-[var(--text-primary)]">
+                      {sc.beyondLeoSummary ? `${sc.beyondLeoSummary.totalDeltaVms.toFixed(1)} m/s` : '\u2014'}
+                    </td>
+                  ))}
+                </tr>
+              )}
             </tbody>
           </table>
         </div>

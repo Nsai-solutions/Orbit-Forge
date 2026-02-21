@@ -1,5 +1,6 @@
 import { DEG2RAD, RAD2DEG, R_EARTH_EQUATORIAL, MU_EARTH_KM } from './constants'
-import { OrbitalElements, keplerianToCartesian, eciToThreeJS } from './coordinate-transforms'
+import { OrbitalElements, keplerianToCartesian, eciToEcefThreeJS } from './coordinate-transforms'
+import { dateToGMST } from './time-utils'
 import type { Vec3 } from '@/types'
 
 /**
@@ -88,24 +89,27 @@ export function generateWalkerConstellation(params: WalkerParams): Constellation
 }
 
 /**
- * Generate 3D positions for all constellation satellites
+ * Generate 3D positions for all constellation satellites (ECEF-aligned)
  */
-export function getConstellationPositions(satellites: ConstellationSatellite[]): Vec3[] {
+export function getConstellationPositions(satellites: ConstellationSatellite[], epoch: Date = new Date()): Vec3[] {
+  const gmst = dateToGMST(epoch)
   return satellites.map((sat) => {
     const { position } = keplerianToCartesian(sat.elements, MU_EARTH_KM)
-    return eciToThreeJS(position)
+    return eciToEcefThreeJS(position, gmst)
   })
 }
 
 /**
- * Generate orbit lines for each plane in the constellation
+ * Generate orbit lines for each plane in the constellation (ECEF-aligned)
  */
 export function getConstellationOrbits(
   params: WalkerParams,
   pointsPerOrbit = 90,
+  epoch: Date = new Date(),
 ): Vec3[][] {
   const semiMajorAxis = R_EARTH_EQUATORIAL + params.altitude
   const raanSpacing = params.type === 'delta' ? 360 / params.planes : 180 / params.planes
+  const gmst = dateToGMST(epoch)
 
   const orbits: Vec3[][] = []
 
@@ -124,7 +128,7 @@ export function getConstellationOrbits(
         trueAnomaly: nu,
       }
       const { position } = keplerianToCartesian(elements, MU_EARTH_KM)
-      points.push(eciToThreeJS(position))
+      points.push(eciToEcefThreeJS(position, gmst))
     }
     orbits.push(points)
   }

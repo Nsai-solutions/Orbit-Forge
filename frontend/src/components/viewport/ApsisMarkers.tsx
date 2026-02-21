@@ -1,23 +1,26 @@
 import { useMemo } from 'react'
 import { Html } from '@react-three/drei'
 import { useStore } from '@/stores'
-import { keplerianToCartesian, eciToThreeJS } from '@/lib/coordinate-transforms'
+import { keplerianToCartesian, eciToEcefThreeJS } from '@/lib/coordinate-transforms'
 import { MU_EARTH_KM, R_EARTH_EQUATORIAL } from '@/lib/constants'
+import { dateToGMST } from '@/lib/time-utils'
 
 export default function ApsisMarkers() {
   const elements = useStore((s) => s.elements)
 
   const markers = useMemo(() => {
+    const gmst = dateToGMST(new Date())
+
     // Perigee is at true anomaly = 0
     const perigeeElements = { ...elements, trueAnomaly: 0 }
     const { position: perigeeEci } = keplerianToCartesian(perigeeElements, MU_EARTH_KM)
-    const perigee = eciToThreeJS(perigeeEci)
+    const perigee = eciToEcefThreeJS(perigeeEci, gmst)
     const perigeeAlt = elements.semiMajorAxis * (1 - elements.eccentricity) - R_EARTH_EQUATORIAL
 
     // Apogee is at true anomaly = 180
     const apogeeElements = { ...elements, trueAnomaly: 180 }
     const { position: apogeeEci } = keplerianToCartesian(apogeeElements, MU_EARTH_KM)
-    const apogee = eciToThreeJS(apogeeEci)
+    const apogee = eciToEcefThreeJS(apogeeEci, gmst)
     const apogeeAlt = elements.semiMajorAxis * (1 + elements.eccentricity) - R_EARTH_EQUATORIAL
 
     return { perigee, apogee, perigeeAlt, apogeeAlt }

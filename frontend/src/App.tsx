@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useStore } from '@/stores'
 import { ModuleId } from '@/types'
+import LandingPage from '@/pages/LandingPage'
 import TopBar from '@/components/layout/TopBar'
 import LeftPanel from '@/components/layout/LeftPanel'
 import RightPanel from '@/components/layout/RightPanel'
@@ -29,10 +30,17 @@ import DeltaVChart from '@/modules/delta-v/DeltaVChart'
 import RadiationPanel from '@/modules/radiation/RadiationPanel'
 import RadiationDisplay from '@/modules/radiation/RadiationDisplay'
 import RadiationChart from '@/modules/radiation/RadiationChart'
+import PayloadPanel from '@/modules/payload/PayloadPanel'
+import PayloadDisplay from '@/modules/payload/PayloadDisplay'
+import PayloadChart from '@/modules/payload/PayloadChart'
+import BeyondLeoPanel from '@/modules/beyond-leo/BeyondLeoPanel'
+import BeyondLeoDisplay from '@/modules/beyond-leo/BeyondLeoDisplay'
+import BeyondLeoChart from '@/modules/beyond-leo/BeyondLeoChart'
 import ComparisonPanel from '@/modules/comparison/ComparisonPanel'
 import ComparisonDisplay from '@/modules/comparison/ComparisonDisplay'
 import ComparisonChart from '@/modules/comparison/ComparisonChart'
 import SaveLoadDialog from '@/components/ui/SaveLoadDialog'
+import MobileOverlay from '@/components/ui/MobileOverlay'
 
 function LeftPanelContent() {
   const activeModule = useStore((s) => s.activeModule)
@@ -59,6 +67,10 @@ function LeftPanelContent() {
       return <DeltaVPanel />
     case ModuleId.Radiation:
       return <RadiationPanel />
+    case ModuleId.Payload:
+      return <PayloadPanel />
+    case ModuleId.BeyondLeo:
+      return <BeyondLeoPanel />
     case ModuleId.Comparison:
       return <ComparisonPanel />
     default:
@@ -85,6 +97,10 @@ function RightPanelContent() {
       return <DeltaVDisplay />
     case ModuleId.Radiation:
       return <RadiationDisplay />
+    case ModuleId.Payload:
+      return <PayloadDisplay />
+    case ModuleId.BeyondLeo:
+      return <BeyondLeoDisplay />
     case ModuleId.Comparison:
       return <ComparisonDisplay />
     default:
@@ -111,6 +127,10 @@ function BottomPanelContent() {
       return <DeltaVChart />
     case ModuleId.Radiation:
       return <RadiationChart />
+    case ModuleId.Payload:
+      return <PayloadChart />
+    case ModuleId.BeyondLeo:
+      return <BeyondLeoChart />
     case ModuleId.Comparison:
       return <ComparisonChart />
     default:
@@ -119,10 +139,28 @@ function BottomPanelContent() {
 }
 
 export default function App() {
+  const [view, setView] = useState<'landing' | 'app'>(() =>
+    window.location.hash === '#app' ? 'app' : 'landing'
+  )
   const [saveDialogOpen, setSaveDialogOpen] = useState(false)
+
+  useEffect(() => {
+    const onHash = () =>
+      setView(window.location.hash === '#app' ? 'app' : 'landing')
+    window.addEventListener('hashchange', onHash)
+    return () => window.removeEventListener('hashchange', onHash)
+  }, [])
+
+  if (view === 'landing') return (
+    <>
+      <MobileOverlay />
+      <LandingPage />
+    </>
+  )
 
   return (
     <div className="w-full h-screen flex flex-col bg-space-900 overflow-hidden">
+      <MobileOverlay />
       <TopBar onSaveLoad={() => setSaveDialogOpen(true)} />
 
       <div className="flex-1 flex overflow-hidden">

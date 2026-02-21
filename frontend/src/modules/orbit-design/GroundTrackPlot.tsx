@@ -53,25 +53,33 @@ export default function GroundTrackPlot() {
       })
     }
 
-    // Current satellite sub-satellite point (first point)
-    if (track.length > 0) {
-      result.push({
-        type: 'scattergeo',
-        lat: [track[0].lat],
-        lon: [track[0].lon],
-        mode: 'markers',
-        marker: { color: '#3B82F6', size: 10, symbol: 'circle' },
-        name: 'Satellite',
-        hoverinfo: 'lat+lon',
-      })
-    }
-
     return result
   }, [elements, activeStations])
 
+  // Dynamic satellite marker driven by 3D animation
+  const satSubPoint = useStore((s) => s.satSubPoint)
+  const satTrace = useMemo(() => {
+    if (!satSubPoint) return null
+    return {
+      type: 'scattergeo' as const,
+      lat: [satSubPoint.lat],
+      lon: [satSubPoint.lon],
+      mode: 'markers' as const,
+      marker: { color: '#3B82F6', size: 10, symbol: 'circle' },
+      name: 'Satellite',
+      hoverinfo: 'lat+lon' as const,
+    }
+  }, [satSubPoint])
+
+  const allTraces = useMemo(() => {
+    const t = [...traces]
+    if (satTrace) t.push(satTrace)
+    return t
+  }, [traces, satTrace])
+
   return (
     <Plot
-      data={traces}
+      data={allTraces}
       layout={{
         geo: {
           showland: true,

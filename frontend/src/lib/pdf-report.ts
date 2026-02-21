@@ -6,6 +6,13 @@ import { computeConstellationMetrics } from './constellation'
 import { computeDeltaVBudget, tsiolkovskyDeltaV } from './delta-v'
 import { computeRadiationEnvironment } from './radiation'
 import { R_EARTH_EQUATORIAL } from './constants'
+import { computeEOAnalysis } from './payload-eo'
+import { computeSARAnalysis } from './payload-sar'
+import { computeSATCOMAnalysis } from './payload-satcom'
+import { computeLagrangeResult } from './lagrange'
+import { computeLunarResult } from './lunar-transfer'
+import { computeInterplanetaryResult } from './interplanetary'
+import { PLANET_DATA } from './beyond-leo-constants'
 
 interface ReportState {
   elements: any
@@ -17,6 +24,12 @@ interface ReportState {
   propulsion?: any
   maneuvers?: any
   shieldingThicknessMm?: number
+  payloadType?: string
+  payloadShared?: any
+  payloadEO?: any
+  payloadSAR?: any
+  payloadSATCOM?: any
+  beyondLeo?: any
 }
 
 export async function generateMissionReport(state: ReportState): Promise<void> {
@@ -373,6 +386,156 @@ export async function generateMissionReport(state: ReportState): Promise<void> {
   addKeyValue('Shielded Dose', `${rad.shieldedDoseKradPerYear.toFixed(2)} krad/yr`)
   addKeyValue('Mission Total Dose', `${rad.missionTotalDoseKrad.toFixed(2)} krad`)
   addKeyValue('Component Guidance', `${rad.componentRecommendation} (${rad.componentStatus})`)
+
+  // ─── Section 10: Payload Analysis ───
+  if (state.payloadType && state.payloadShared) {
+    addSectionTitle('Payload Analysis')
+
+    const pShared = state.payloadShared
+    addKeyValue('Payload Type', state.payloadType.toUpperCase())
+    addKeyValue('Payload Name', pShared.name || 'Unnamed')
+    addKeyValue('Mass', `${pShared.mass} kg`)
+    addKeyValue('Peak Power', `${pShared.powerPeak} W`)
+    addKeyValue('Avg Power', `${pShared.powerAvg} W`)
+    addKeyValue('Duty Cycle', `${(pShared.dutyCycle * 100).toFixed(0)}%`)
+    addKeyValue('Data Rate', `${pShared.dataRate} Mbps`)
+    addKeyValue('Storage', `${pShared.storageCapacity} GB`)
+
+    if (state.payloadType === 'earth-observation' && state.payloadEO) {
+      const eoResult = computeEOAnalysis(state.payloadEO, pShared, avgAlt, elements.inclination)
+      addTable(
+        ['EO Metric', 'Value'],
+        [
+          ['GSD (Nadir)', `${eoResult.gsdNadir.toFixed(2)} m`],
+          ['GSD (Off-Nadir)', `${eoResult.gsdOffNadir.toFixed(2)} m`],
+          ['Swath Width', `${eoResult.swathWidth.toFixed(1)} km`],
+          ['FOV', `${eoResult.fovCrossTrack.toFixed(2)}°`],
+          ['IFOV', `${eoResult.ifov.toFixed(1)} μrad`],
+          ['F-number', `f/${eoResult.fNumber.toFixed(1)}`],
+          ['SNR', `${eoResult.snr.toFixed(0)}`],
+          ['Daily Coverage', `${eoResult.dailyImagingCapacity.toFixed(0)} km²`],
+          ['Revisit Time', `${eoResult.revisitTime.toFixed(1)} days`],
+          ['Data Volume/Day', `${eoResult.dataVolumePerDay.toFixed(1)} GB`],
+        ]
+      )
+    }
+
+    if (state.payloadType === 'sar' && state.payloadSAR) {
+      const sarResult = computeSARAnalysis(state.payloadSAR, pShared, avgAlt)
+      addTable(
+        ['SAR Metric', 'Value'],
+        [
+          ['Wavelength', `${(sarResult.wavelength * 100).toFixed(2)} cm`],
+          ['Slant Range', `${sarResult.slantRange.toFixed(0)} km`],
+          ['Ground Range Res', `${sarResult.groundRangeRes.toFixed(2)} m`],
+          ['Azimuth Res', `${sarResult.azimuthRes.toFixed(2)} m`],
+          ['Swath Width', `${sarResult.swathWidth.toFixed(1)} km`],
+          ['NESZ', `${sarResult.nesz.toFixed(1)} dB`],
+          ['Data Rate', `${sarResult.dataRateComputed.toFixed(0)} Mbps`],
+          ['PRF Status', sarResult.prfStatus === 'ok' ? 'OK' : sarResult.prfStatus === 'marginal' ? 'MARGINAL' : 'INVALID'],
+          ['Coverage Rate', `${sarResult.areaCoverageRate.toFixed(1)} km²/s`],
+          ['Data Volume/Day', `${sarResult.dataVolumePerDay.toFixed(1)} GB`],
+        ]
+      )
+    }
+
+    if (state.payloadType === 'satcom' && state.payloadSATCOM) {
+      const satcomResult = computeSATCOMAnalysis(state.payloadSATCOM, pShared, avgAlt)
+      addTable(
+        ['SATCOM Metric', 'Value'],
+        [
+          ['Sat Antenna Gain', `${satcomResult.satAntennaGain.toFixed(1)} dBi`],
+          ['GS Antenna Gain', `${satcomResult.gsAntennaGain.toFixed(1)} dBi`],
+          ['EIRP', `${satcomResult.satEIRP.toFixed(1)} dBW`],
+          ['G/T', `${satcomResult.gsGOverT.toFixed(1)} dB/K`],
+          ['FSPL', `${satcomResult.fspl.toFixed(1)} dB`],
+          ['Eb/N0', `${satcomResult.ebN0.toFixed(1)} dB`],
+          ['Link Margin', `${satcomResult.linkMargin.toFixed(1)} dB`],
+          ['Max Data Rate', `${satcomResult.maxDataRate.toFixed(2)} Mbps`],
+          ['Beam Footprint', `${satcomResult.beamFootprintKm.toFixed(0)} km`],
+          ['Data Volume/Day', `${satcomResult.dataVolumePerDay.toFixed(2)} GB`],
+        ]
+      )
+    }
+  }
+
+  // ─── Section 11: Beyond-LEO Mission Design ───
+  if (state.beyondLeo) {
+    const bl = state.beyondLeo
+    addSectionTitle('Beyond-LEO Mission Design')
+    addKeyValue('Mode', bl.mode.charAt(0).toUpperCase() + bl.mode.slice(1))
+
+    if (bl.mode === 'lagrange' && bl.lagrangeParams) {
+      const lr = computeLagrangeResult(bl.lagrangeParams)
+      addKeyValue('System', bl.lagrangeParams.system === 'SE' ? 'Sun-Earth' : 'Earth-Moon')
+      addKeyValue('Lagrange Point', `${bl.lagrangeParams.system}-${bl.lagrangeParams.point}`)
+      addKeyValue('Orbit Type', bl.lagrangeParams.orbitType)
+      addKeyValue('Departure Altitude', `${bl.lagrangeParams.departureAltKm} km`)
+      addKeyValue('Transfer Type', bl.lagrangeParams.transferType)
+      addTable(
+        ['Metric', 'Value'],
+        [
+          ['L-Point Distance', `${lr.pointDistanceKm.toLocaleString()} km (${lr.pointDistanceAU.toFixed(4)} AU)`],
+          ['Transfer ΔV', `${lr.transferDeltaVms.toFixed(1)} m/s`],
+          ['Insertion ΔV', `${lr.insertionDeltaVms.toFixed(1)} m/s`],
+          ['Total ΔV', `${lr.totalDeltaVms.toFixed(1)} m/s`],
+          ['Transfer Time', `${lr.transferTimeDays.toFixed(1)} days`],
+          ['Halo Period', `${lr.haloPeriodDays.toFixed(1)} days`],
+          ['Stability', lr.stabilityClass],
+          ['Station-Keeping', `${lr.annualStationKeepingMs.toFixed(1)} m/s/yr`],
+          ['Comms Distance', `${lr.commsDistanceKm.toLocaleString()} km`],
+          ['One-Way Delay', `${lr.commsDelayS.toFixed(2)} s`],
+          ['Mission Total ΔV', `${lr.missionTotalDeltaVms.toFixed(1)} m/s`],
+        ]
+      )
+    }
+
+    if (bl.mode === 'lunar' && bl.lunarParams) {
+      const lnr = computeLunarResult(bl.lunarParams)
+      addKeyValue('Mission Type', bl.lunarParams.missionType)
+      addKeyValue('Transfer Type', bl.lunarParams.transferType)
+      addKeyValue('Departure Altitude', `${bl.lunarParams.departureAltKm} km`)
+      if (bl.lunarParams.missionType !== 'flyby') {
+        addKeyValue('Target Orbit Altitude', `${bl.lunarParams.targetOrbitAltKm} km`)
+      }
+      addTable(
+        ['Metric', 'Value'],
+        [
+          ['TLI ΔV', `${lnr.tliDeltaVms.toFixed(1)} m/s`],
+          ['LOI ΔV', `${lnr.loiDeltaVms.toFixed(1)} m/s`],
+          ['Total ΔV', `${lnr.totalDeltaVms.toFixed(1)} m/s`],
+          ['Transfer Time', `${lnr.transferTimeDays.toFixed(1)} days`],
+          ['Phase Angle', `${lnr.phaseAngleDeg.toFixed(1)}°`],
+          ['Lunar Orbit Period', `${lnr.lunarOrbitPeriodMin.toFixed(1)} min`],
+          ['Propellant Required', `${lnr.propellantRequiredKg.toFixed(2)} kg`],
+          ['One-Way Delay', `${lnr.commDelayS.toFixed(2)} s`],
+        ]
+      )
+    }
+
+    if (bl.mode === 'interplanetary' && bl.interplanetaryParams) {
+      const ip = bl.interplanetaryParams
+      const ir = computeInterplanetaryResult(ip)
+      const pd = PLANET_DATA[ip.targetBody as keyof typeof PLANET_DATA]
+      addKeyValue('Target', pd?.name ?? ip.targetBody)
+      addKeyValue('Mission Type', ip.missionType)
+      addKeyValue('Transfer Type', ip.transferType)
+      addKeyValue('Departure Altitude', `${ip.departureAltKm} km`)
+      addTable(
+        ['Metric', 'Value'],
+        [
+          ['C3', `${ir.c3Km2s2.toFixed(2)} km²/s²`],
+          ['Departure ΔV', `${ir.departureDeltaVms.toFixed(1)} m/s`],
+          ['Arrival V∞', `${ir.arrivalVinfKms.toFixed(2)} km/s`],
+          ['Insertion ΔV', `${ir.arrivalInsertionDeltaVms.toFixed(1)} m/s`],
+          ['Total ΔV', `${ir.totalDeltaVms.toFixed(1)} m/s`],
+          ['Transfer Time', `${ir.transferTimeDays.toFixed(0)} days`],
+          ['Comms Distance', `${ir.commsDistanceAU.toFixed(2)} AU`],
+          ['One-Way Delay', `${(ir.commsDelayS / 60).toFixed(1)} min`],
+        ]
+      )
+    }
+  }
 
   // Add footer to last page
   addFooter()

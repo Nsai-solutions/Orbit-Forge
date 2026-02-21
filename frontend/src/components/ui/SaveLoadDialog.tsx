@@ -53,6 +53,27 @@ function restoreProjectData(data: any) {
   if (data.scenarios) {
     state.setScenarios(data.scenarios)
   }
+  if (data.payloadType) {
+    state.setPayloadType(data.payloadType)
+  }
+  if (data.payloadShared) {
+    state.updatePayloadShared(data.payloadShared)
+  }
+  if (data.payloadEO) {
+    state.updatePayloadEO(data.payloadEO)
+  }
+  if (data.payloadSAR) {
+    state.updatePayloadSAR(data.payloadSAR)
+  }
+  if (data.payloadSATCOM) {
+    state.updatePayloadSATCOM(data.payloadSATCOM)
+  }
+  if (data.beyondLeo) {
+    if (data.beyondLeo.mode) state.setBeyondLeoMode(data.beyondLeo.mode)
+    if (data.beyondLeo.lagrangeParams) state.updateLagrangeParams(data.beyondLeo.lagrangeParams)
+    if (data.beyondLeo.lunarParams) state.updateLunarParams(data.beyondLeo.lunarParams)
+    if (data.beyondLeo.interplanetaryParams) state.updateInterplanetaryParams(data.beyondLeo.interplanetaryParams)
+  }
 }
 
 export default function SaveLoadDialog({ open, onClose }: SaveLoadDialogProps) {

@@ -1,5 +1,5 @@
 import { MU_EARTH_KM, R_EARTH_EQUATORIAL, J2, DEG2RAD, RAD2DEG, OMEGA_EARTH, SEC_PER_DAY } from './constants'
-import { OrbitalElements, keplerianToCartesian, eciToEcef, ecefToGeodetic, eciToThreeJS } from './coordinate-transforms'
+import { OrbitalElements, keplerianToCartesian, eciToEcef, ecefToGeodetic, eciToEcefThreeJS } from './coordinate-transforms'
 import { dateToGMST } from './time-utils'
 import type { Vec3 } from '@/types'
 
@@ -153,13 +153,16 @@ export function computeRevsPerDay(a: number): number {
 
 /**
  * Propagate an orbit and generate position arrays for 3D rendering
- * Returns positions in Three.js coordinates (Earth radii units)
+ * Returns positions in ECEF-aligned Three.js coordinates (Earth radii units)
+ * so the orbit line aligns with the Earth globe texture and ground tracks.
  */
 export function propagateOrbitPositions(
   elements: OrbitalElements,
-  numPoints = 360
+  numPoints = 360,
+  epoch: Date = new Date()
 ): Vec3[] {
   const positions: Vec3[] = []
+  const gmst = dateToGMST(epoch)
 
   for (let i = 0; i <= numPoints; i++) {
     const nu = (i / numPoints) * 360 // true anomaly in degrees
@@ -169,7 +172,7 @@ export function propagateOrbitPositions(
     }
 
     const { position } = keplerianToCartesian(elemAtPoint, MU_EARTH_KM)
-    positions.push(eciToThreeJS(position))
+    positions.push(eciToEcefThreeJS(position, gmst))
   }
 
   return positions
@@ -177,11 +180,12 @@ export function propagateOrbitPositions(
 
 /**
  * Get satellite position at a specific true anomaly
- * Returns position in Three.js coordinates
+ * Returns position in ECEF-aligned Three.js coordinates
  */
-export function getSatellitePosition(elements: OrbitalElements): Vec3 {
+export function getSatellitePosition(elements: OrbitalElements, epoch: Date = new Date()): Vec3 {
   const { position } = keplerianToCartesian(elements, MU_EARTH_KM)
-  return eciToThreeJS(position)
+  const gmst = dateToGMST(epoch)
+  return eciToEcefThreeJS(position, gmst)
 }
 
 /**

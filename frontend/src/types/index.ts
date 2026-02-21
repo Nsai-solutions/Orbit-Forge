@@ -7,6 +7,8 @@ export enum ModuleId {
   Constellation = 'constellation',
   DeltaV = 'delta-v',
   Radiation = 'radiation',
+  Payload = 'payload',
+  BeyondLeo = 'beyond-leo',
   Comparison = 'comparison',
 }
 
@@ -19,6 +21,8 @@ export const MODULE_LABELS: Record<ModuleId, string> = {
   [ModuleId.Constellation]: 'Constellation',
   [ModuleId.DeltaV]: '\u0394V Budget',
   [ModuleId.Radiation]: 'Radiation',
+  [ModuleId.Payload]: 'Payload',
+  [ModuleId.BeyondLeo]: 'Beyond-LEO',
   [ModuleId.Comparison]: 'Compare',
 }
 
@@ -31,7 +35,9 @@ export const MODULE_NUMBERS: Record<ModuleId, number> = {
   [ModuleId.Constellation]: 6,
   [ModuleId.DeltaV]: 7,
   [ModuleId.Radiation]: 8,
-  [ModuleId.Comparison]: 9,
+  [ModuleId.Payload]: 9,
+  [ModuleId.BeyondLeo]: 10,
+  [ModuleId.Comparison]: 11,
 }
 
 export interface Vec3 {

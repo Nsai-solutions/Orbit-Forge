@@ -1,7 +1,10 @@
 import { Suspense } from 'react'
 import { Canvas } from '@react-three/fiber'
 import { ACESFilmicToneMapping, SRGBColorSpace } from 'three'
+import { useStore } from '@/stores'
+import { ModuleId } from '@/types'
 import EarthScene from '@/components/viewport/EarthScene'
+import BeyondLeoScene from '@/components/viewport/BeyondLeoScene'
 
 function LoadingFallback() {
   return (
@@ -14,12 +17,21 @@ function LoadingFallback() {
   )
 }
 
+function SceneSelector() {
+  const activeModule = useStore((s) => s.activeModule)
+
+  if (activeModule === ModuleId.BeyondLeo) {
+    return <BeyondLeoScene />
+  }
+  return <EarthScene />
+}
+
 export default function CenterViewport() {
   return (
     <div className="relative flex-1 bg-space-900 overflow-hidden">
       <Suspense fallback={<LoadingFallback />}>
         <Canvas
-          camera={{ position: [0, 0.8, 3], fov: 45, near: 0.01, far: 200 }}
+          camera={{ position: [0, 0.8, 3], fov: 45, near: 0.01, far: 1000 }}
           dpr={[1, 1.5]}
           frameloop="always"
           gl={{
@@ -31,7 +43,7 @@ export default function CenterViewport() {
           }}
           style={{ background: '#0A0E17' }}
         >
-          <EarthScene />
+          <SceneSelector />
         </Canvas>
       </Suspense>
     </div>
