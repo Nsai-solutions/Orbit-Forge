@@ -211,12 +211,12 @@ export default function LunarScene() {
         <Line points={transferPoints} color={COL_APPROACH} lineWidth={2} transparent opacity={0.8} />
       )}
       {lunarOrbitPoints.length > 2 && (
-        <Line points={lunarOrbitPoints} color={COL_ORBIT} lineWidth={1.5} transparent opacity={0.7} />
+        <Line points={lunarOrbitPoints} color={COL_ORBIT} lineWidth={2.5} transparent opacity={0.9} />
       )}
 
       {/* ═══ LANDING ═══ */}
       {descentPoints.length > 2 && (
-        <Line points={descentPoints} color={COL_DESCENT} lineWidth={2} transparent opacity={0.8} />
+        <Line points={descentPoints} color={COL_DESCENT} lineWidth={2.5} transparent opacity={0.9} />
       )}
       {landingMarker && (
         <AnnotationLabel position={landingMarker} color={COL_DESCENT} text="Landing" offsetY={-12} />

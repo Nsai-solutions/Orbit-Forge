@@ -265,7 +265,7 @@ export function generateFlybyPath(
   for (let i = 1; i <= departN; i++) {
     const t = i / departN
     const dist = t * moonX * 0.5
-    departure.push({ x: lastFlyby.x + dist * normDirX, y: 0, z: lastFlyby.z + dist * normDirZ - t * t * 0.05 })
+    departure.push({ x: lastFlyby.x + dist * normDirX, y: 0, z: lastFlyby.z + dist * normDirZ })
   }
 
   return { approach, nearMoon, departure, closestApproach, earthReturn: null }
@@ -287,23 +287,37 @@ export function generateFreeReturnTrajectory(
   const departure: Vec3[] = []
   const loopHeight = moonX * 0.25
 
+  // Pre-compute swing arc endpoints for seamless phase continuity.
+  // periFactor at t=0 and t=1 equals 3 (|t-0.5|=0.5 → 1+2*(2*0.5)²=3).
+  const swingStartAngle = Math.PI * 0.7
+  const swingEndAngle = -Math.PI * 0.7
+  const endDist = swingbyR * 3
+  const swingStartPt: Vec3 = {
+    x: moonX + endDist * Math.cos(swingStartAngle), y: 0,
+    z: endDist * Math.sin(swingStartAngle),
+  }
+  const swingEndPt: Vec3 = {
+    x: moonX + endDist * Math.cos(swingEndAngle), y: 0,
+    z: endDist * Math.sin(swingEndAngle),
+  }
+
+  // ── Outbound: Earth (0,0) → swingStartPt, bulging ABOVE (+z) ──
   const outN = Math.floor(numPoints * 0.38)
   for (let i = 0; i <= outN; i++) {
     const t = i / outN
-    const x = t * (moonX - swingbyR * 2)
-    const z = loopHeight * Math.sin(t * Math.PI * 0.9)
+    const x = t * swingStartPt.x
+    const z = swingStartPt.z * t + loopHeight * Math.sin(t * Math.PI)
     approach.push({ x, y: 0, z })
   }
 
+  // ── Swing arc: around far side of Moon ──
   const swingN = Math.floor(numPoints * 0.14)
   nearMoon.push({ ...approach[approach.length - 1] })
-  const swingStart = Math.PI * 0.6
-  const swingEnd = -Math.PI * 0.6
   let closestApproach: Vec3 | null = null
   let minDist = Infinity
   for (let i = 1; i <= swingN; i++) {
     const t = i / swingN
-    const angle = swingStart + t * (swingEnd - swingStart)
+    const angle = swingStartAngle + t * (swingEndAngle - swingStartAngle)
     const periFactor = 1 + 2.0 * Math.pow(2 * Math.abs(t - 0.5), 2)
     const dist = swingbyR * periFactor
     const pt: Vec3 = { x: moonX + dist * Math.cos(angle), y: 0, z: dist * Math.sin(angle) }
@@ -311,14 +325,13 @@ export function generateFreeReturnTrajectory(
     if (dist < minDist) { minDist = dist; closestApproach = { ...pt } }
   }
 
+  // ── Return: swingEndPt → Earth (0,0), bulging BELOW (−z) ──
   const retN = numPoints - outN - swingN
-  const swingEnd_pt = nearMoon[nearMoon.length - 1]
-  departure.push({ ...swingEnd_pt })
+  departure.push({ ...nearMoon[nearMoon.length - 1] })
   for (let i = 1; i <= retN; i++) {
     const t = i / retN
-    const x = swingEnd_pt.x - t * swingEnd_pt.x
-    const returnBulge = -loopHeight * Math.sin(t * Math.PI * 0.85)
-    const z = swingEnd_pt.z * (1 - t) + returnBulge * t
+    const x = swingEndPt.x * (1 - t)
+    const z = swingEndPt.z * (1 - t) - loopHeight * Math.sin(t * Math.PI)
     departure.push({ x, y: 0, z })
   }
 
