@@ -228,49 +228,132 @@ export function generateFlybyPath(
   numPoints = 120,
 ): PhasedTrajectory {
   const moonX = MOON_SEMI_MAJOR_AXIS / LUNAR_SCENE_SCALE
+  const rPark = (R_EARTH_EQUATORIAL + departureAltKm) / LUNAR_SCENE_SCALE
   const caRatio = closestApproachKm / R_MOON
   const flybyR = VISUAL_MOON_R * (1 + Math.max(caRatio * 20, 0.8))
   const approach: Vec3[] = []
   const nearMoon: Vec3[] = []
   const departure: Vec3[] = []
 
-  const approachN = Math.floor(numPoints * 0.5)
-  const approachEndX = moonX - flybyR * 2
-  const approachCurve = moonX * 0.08
+  // ── Approach: half-ellipse from Earth toward Moon (matching transfer arc pattern) ──
+  const approachBulge = moonX * 0.12
+  // Binary search for theta where half-ellipse reaches ~2.5*flybyR from Moon
+  const junctionTargetDist = flybyR * 2.5
+  let thetaLo = 0, thetaHi = Math.PI
+  for (let iter = 0; iter < 40; iter++) {
+    const thetaMid = (thetaLo + thetaHi) / 2
+    const xm = rPark + (moonX - rPark) * (1 - Math.cos(thetaMid)) / 2
+    const zm = -approachBulge * Math.sin(thetaMid)
+    const dm = Math.sqrt((xm - moonX) ** 2 + zm * zm)
+    if (dm > junctionTargetDist) thetaLo = thetaMid
+    else thetaHi = thetaMid
+  }
+  const thetaEnd = (thetaLo + thetaHi) / 2
+
+  const approachN = Math.floor(numPoints * 0.6)
   for (let i = 0; i <= approachN; i++) {
-    const t = i / approachN
-    approach.push({ x: t * approachEndX, y: 0, z: -approachCurve * Math.sin(t * Math.PI * 0.5) })
+    const theta = (i / approachN) * thetaEnd
+    const x = rPark + (moonX - rPark) * (1 - Math.cos(theta)) / 2
+    const z = -approachBulge * Math.sin(theta)
+    approach.push({ x, y: 0, z })
   }
 
-  const flybyN = Math.floor(numPoints * 0.25)
-  const arcStartAngle = Math.PI * 0.7
-  const arcEndAngle = -Math.PI * 0.13
+  // ── Compute approach tangent at junction via finite difference ──
+  const dt = 0.001
+  const thBefore = thetaEnd - dt
+  const thAfter = thetaEnd + dt
+  const pBx = rPark + (moonX - rPark) * (1 - Math.cos(thBefore)) / 2
+  const pBz = -approachBulge * Math.sin(thBefore)
+  const pAx = rPark + (moonX - rPark) * (1 - Math.cos(thAfter)) / 2
+  const pAz = -approachBulge * Math.sin(thAfter)
+  const rawTanX = (pAx - pBx) / (2 * dt)
+  const rawTanZ = (pAz - pBz) / (2 * dt)
+  const tanMag = Math.sqrt(rawTanX * rawTanX + rawTanZ * rawTanZ)
+  const approachTanX = rawTanX / tanMag
+  const approachTanZ = rawTanZ / tanMag
+
+  // ── Flyby geometry ──
+  const deflectionAngle = 55 * Math.PI / 180
+  const junctionPt = approach[approach.length - 1]
+  const jRelX = junctionPt.x - moonX
+  const jRelZ = junctionPt.z
+  const jAngle = Math.atan2(jRelZ, jRelX)
+  const jDist = Math.sqrt(jRelX * jRelX + jRelZ * jRelZ)
+
+  // Periapsis: midway through deflection, on the near side of Moon
+  const periAngle = jAngle + deflectionAngle / 2
+  const periX = moonX + flybyR * Math.cos(periAngle)
+  const periZ = flybyR * Math.sin(periAngle)
+  // Periapsis tangent: perpendicular to radial (counterclockwise)
+  const periTanX = -Math.sin(periAngle)
+  const periTanZ = Math.cos(periAngle)
+
+  // Exit point: same distance as junction, at deflected angle
+  const exitAngle = jAngle + deflectionAngle
+  const exitX = moonX + jDist * Math.cos(exitAngle)
+  const exitZ = jDist * Math.sin(exitAngle)
+
+  // Departure tangent: approach tangent rotated by deflection angle
+  const departTanX = approachTanX * Math.cos(deflectionAngle) - approachTanZ * Math.sin(deflectionAngle)
+  const departTanZ = approachTanX * Math.sin(deflectionAngle) + approachTanZ * Math.cos(deflectionAngle)
+
+  // ── Flyby arc: two cubic Bezier segments joined at periapsis (C1 continuous) ──
+  const flybyN = Math.floor(numPoints * 0.2)
+  const halfN = Math.floor(flybyN / 2)
+  const arm = jDist * 0.4 // Bezier control arm length
+
+  // Segment 1: junction → periapsis
+  const S1P0x = junctionPt.x, S1P0z = junctionPt.z
+  const S1P1x = S1P0x + arm * approachTanX, S1P1z = S1P0z + arm * approachTanZ
+  const S1P3x = periX, S1P3z = periZ
+  const S1P2x = periX - arm * periTanX, S1P2z = periZ - arm * periTanZ
+
+  nearMoon.push({ ...junctionPt })
   let closestApproach: Vec3 | null = null
   let minDistFromMoon = Infinity
-  nearMoon.push({ ...approach[approach.length - 1] })
-  for (let i = 0; i <= flybyN; i++) {
-    const t = i / flybyN
-    const angle = arcStartAngle + t * (arcEndAngle - arcStartAngle)
-    const periapsisFactor = 1 + 0.8 * Math.pow(2 * Math.abs(t - 0.5), 2)
-    const dist = flybyR * periapsisFactor
-    const pt: Vec3 = { x: moonX + dist * Math.cos(angle), y: 0, z: dist * Math.sin(angle) }
+
+  for (let i = 1; i <= halfN; i++) {
+    const t = i / halfN
+    const u = 1 - t
+    const bx = u * u * u * S1P0x + 3 * u * u * t * S1P1x + 3 * u * t * t * S1P2x + t * t * t * S1P3x
+    const bz = u * u * u * S1P0z + 3 * u * u * t * S1P1z + 3 * u * t * t * S1P2z + t * t * t * S1P3z
+    const pt: Vec3 = { x: bx, y: 0, z: bz }
     nearMoon.push(pt)
-    if (dist < minDistFromMoon) { minDistFromMoon = dist; closestApproach = { ...pt } }
+    const dm = Math.sqrt((bx - moonX) ** 2 + bz * bz)
+    if (dm < minDistFromMoon) { minDistFromMoon = dm; closestApproach = { ...pt } }
   }
 
+  // Segment 2: periapsis → exit
+  const S2P0x = periX, S2P0z = periZ
+  const S2P1x = periX + arm * periTanX, S2P1z = periZ + arm * periTanZ
+  const S2P3x = exitX, S2P3z = exitZ
+  const S2P2x = exitX - arm * departTanX, S2P2z = exitZ - arm * departTanZ
+
+  for (let i = 1; i <= flybyN - halfN; i++) {
+    const t = i / (flybyN - halfN)
+    const u = 1 - t
+    const bx = u * u * u * S2P0x + 3 * u * u * t * S2P1x + 3 * u * t * t * S2P2x + t * t * t * S2P3x
+    const bz = u * u * u * S2P0z + 3 * u * u * t * S2P1z + 3 * u * t * t * S2P2z + t * t * t * S2P3z
+    const pt: Vec3 = { x: bx, y: 0, z: bz }
+    nearMoon.push(pt)
+    const dm = Math.sqrt((bx - moonX) ** 2 + bz * bz)
+    if (dm < minDistFromMoon) { minDistFromMoon = dm; closestApproach = { ...pt } }
+  }
+
+  // ── Departure: curved continuation past Moon along deflected direction ──
   const departN = numPoints - approachN - flybyN
-  const lastFlyby = nearMoon[nearMoon.length - 1]
-  departure.push({ ...lastFlyby })
-  const prevPt = nearMoon[nearMoon.length - 2]
-  const dirX = lastFlyby.x - prevPt.x
-  const dirZ = lastFlyby.z - prevPt.z
-  const dirMag = Math.sqrt(dirX * dirX + dirZ * dirZ)
-  const normDirX = dirX / dirMag
-  const normDirZ = dirZ / dirMag
+  const lastFlybyPt = nearMoon[nearMoon.length - 1]
+  departure.push({ ...lastFlybyPt })
+  const departExtent = 0.4
+
   for (let i = 1; i <= departN; i++) {
     const t = i / departN
-    const dist = t * moonX * 0.5
-    departure.push({ x: lastFlyby.x + dist * normDirX, y: 0, z: lastFlyby.z + dist * normDirZ })
+    const curve = t * t * 0.08
+    departure.push({
+      x: lastFlybyPt.x + (t * departExtent + curve) * departTanX,
+      y: 0,
+      z: lastFlybyPt.z + (t * departExtent + curve) * departTanZ,
+    })
   }
 
   return { approach, nearMoon, departure, closestApproach, earthReturn: null }
@@ -290,13 +373,14 @@ export function generateFreeReturnTrajectory(
   const approach: Vec3[] = []
   const nearMoon: Vec3[] = []
   const departure: Vec3[] = []
-  const loopHeight = moonX * 0.25
+  const bulge = moonX * 0.22 // z-axis bulge for figure-8 shape
 
   // Pre-compute swing arc endpoints for seamless phase continuity.
-  // periFactor at t=0 and t=1 equals 3 (|t-0.5|=0.5 → 1+2*(2*0.5)²=3).
-  const swingStartAngle = Math.PI * 0.7
-  const swingEndAngle = -Math.PI * 0.7
-  const endDist = swingbyR * 3
+  // periFactor at edges: 1 + 0.8*(2*0.5)² = 1.8
+  const swingStartAngle = Math.PI * 0.55
+  const swingEndAngle = -Math.PI * 0.55
+  const edgePeriFactor = 1 + 0.8 * Math.pow(2 * 0.5, 2) // 1.8
+  const endDist = swingbyR * edgePeriFactor
   const swingStartPt: Vec3 = {
     x: moonX + endDist * Math.cos(swingStartAngle), y: 0,
     z: endDist * Math.sin(swingStartAngle),
@@ -306,16 +390,16 @@ export function generateFreeReturnTrajectory(
     z: endDist * Math.sin(swingEndAngle),
   }
 
-  // ── Outbound: Earth (0,0) → swingStartPt, bulging ABOVE (+z) ──
-  const outN = Math.floor(numPoints * 0.38)
+  // ── Outbound: Earth (0,0) → swingStartPt, arcing on +z side ──
+  const outN = Math.floor(numPoints * 0.37)
   for (let i = 0; i <= outN; i++) {
     const t = i / outN
     const x = t * swingStartPt.x
-    const z = swingStartPt.z * t + loopHeight * Math.sin(t * Math.PI)
+    const z = bulge * Math.sin(t * Math.PI) + swingStartPt.z * t
     approach.push({ x, y: 0, z })
   }
 
-  // ── Swing arc: around far side of Moon ──
+  // ── Swing arc: around far side of Moon (xz plane, y=0) ──
   const swingN = Math.floor(numPoints * 0.14)
   nearMoon.push({ ...approach[approach.length - 1] })
   let closestApproach: Vec3 | null = null
@@ -323,20 +407,22 @@ export function generateFreeReturnTrajectory(
   for (let i = 1; i <= swingN; i++) {
     const t = i / swingN
     const angle = swingStartAngle + t * (swingEndAngle - swingStartAngle)
-    const periFactor = 1 + 2.0 * Math.pow(2 * Math.abs(t - 0.5), 2)
+    const periFactor = 1 + 0.8 * Math.pow(2 * Math.abs(t - 0.5), 2)
     const dist = swingbyR * periFactor
     const pt: Vec3 = { x: moonX + dist * Math.cos(angle), y: 0, z: dist * Math.sin(angle) }
     nearMoon.push(pt)
     if (dist < minDist) { minDist = dist; closestApproach = { ...pt } }
   }
 
-  // ── Return: swingEndPt → Earth (0,0), bulging BELOW (−z) ──
+  // ── Return: swingEndPt → Earth, arcing on -z side (creates figure-8) ──
   const retN = numPoints - outN - swingN
   departure.push({ ...nearMoon[nearMoon.length - 1] })
+  const reentryX = 0.02
+  const reentryZ = -0.01
   for (let i = 1; i <= retN; i++) {
     const t = i / retN
-    const x = swingEndPt.x * (1 - t)
-    const z = swingEndPt.z * (1 - t) - loopHeight * Math.sin(t * Math.PI)
+    const x = swingEndPt.x * (1 - t) + reentryX * t
+    const z = -bulge * Math.sin(t * Math.PI) + swingEndPt.z * (1 - t) + reentryZ * t
     departure.push({ x, y: 0, z })
   }
 
