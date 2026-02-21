@@ -123,10 +123,10 @@ export function computePlanetPosition(
   const j2000 = new Date('2000-01-01T12:00:00Z')
   const daysSinceJ2000 = (date.getTime() - j2000.getTime()) / 86400000
 
-  // Mean anomaly (simplified — circular orbit assumption)
+  // Mean longitude (circular orbit approximation)
   const meanMotion = 360 / planet.orbitalPeriodDays // deg/day
-  const meanAnomaly = (meanMotion * daysSinceJ2000) % 360
-  const angleRad = (meanAnomaly * Math.PI) / 180
+  const meanLongitude = (planet.meanLongitudeAtJ2000Deg + meanMotion * daysSinceJ2000) % 360
+  const angleRad = (meanLongitude * Math.PI) / 180
 
   const r = planet.semiMajorAxisKm
   return {
@@ -143,8 +143,8 @@ export function computeEarthPosition(date: Date): { x: number; y: number; z: num
   const j2000 = new Date('2000-01-01T12:00:00Z')
   const daysSinceJ2000 = (date.getTime() - j2000.getTime()) / 86400000
   const meanMotion = 360 / EARTH_ORBITAL_DATA.orbitalPeriodDays
-  const meanAnomaly = (meanMotion * daysSinceJ2000) % 360
-  const angleRad = (meanAnomaly * Math.PI) / 180
+  const meanLongitude = (EARTH_ORBITAL_DATA.meanLongitudeAtJ2000Deg + meanMotion * daysSinceJ2000) % 360
+  const angleRad = (meanLongitude * Math.PI) / 180
   const r = EARTH_ORBITAL_DATA.semiMajorAxisKm
   return {
     x: r * Math.cos(angleRad),
@@ -190,7 +190,7 @@ export function solveLambert(
   // Start at z = 0 (parabolic); the finite-difference derivative converges reliably from here
   let z = 0
   const maxIter = 100
-  const tol = 1e-8
+  const tol = 1e-6
   const sqrtMu = Math.sqrt(mu)
 
   for (let iter = 0; iter < maxIter; iter++) {

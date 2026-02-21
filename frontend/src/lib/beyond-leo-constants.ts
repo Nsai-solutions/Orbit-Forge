@@ -76,6 +76,7 @@ export interface PlanetData {
   surfaceGravityMs2: number
   atmosphereType: 'none' | 'thin' | 'moderate' | 'thick'
   synodicPeriodDays: number
+  meanLongitudeAtJ2000Deg: number // mean longitude at J2000 epoch (degrees)
   color: string                 // hex color for 3D rendering
 }
 
@@ -92,6 +93,7 @@ export const PLANET_DATA: Record<TargetBody, PlanetData> = {
     surfaceGravityMs2: 3.70,
     atmosphereType: 'none',
     synodicPeriodDays: 115.88,
+    meanLongitudeAtJ2000Deg: 252.251,
     color: '#A0522D',
   },
   venus: {
@@ -106,6 +108,7 @@ export const PLANET_DATA: Record<TargetBody, PlanetData> = {
     surfaceGravityMs2: 8.87,
     atmosphereType: 'thick',
     synodicPeriodDays: 583.92,
+    meanLongitudeAtJ2000Deg: 181.980,
     color: '#DEB887',
   },
   mars: {
@@ -120,6 +123,7 @@ export const PLANET_DATA: Record<TargetBody, PlanetData> = {
     surfaceGravityMs2: 3.71,
     atmosphereType: 'thin',
     synodicPeriodDays: 779.96,
+    meanLongitudeAtJ2000Deg: 355.433,
     color: '#CD5C5C',
   },
   jupiter: {
@@ -134,6 +138,7 @@ export const PLANET_DATA: Record<TargetBody, PlanetData> = {
     surfaceGravityMs2: 24.79,
     atmosphereType: 'thick',
     synodicPeriodDays: 398.88,
+    meanLongitudeAtJ2000Deg: 34.351,
     color: '#DAA06D',
   },
   saturn: {
@@ -148,6 +153,7 @@ export const PLANET_DATA: Record<TargetBody, PlanetData> = {
     surfaceGravityMs2: 10.44,
     atmosphereType: 'thick',
     synodicPeriodDays: 378.09,
+    meanLongitudeAtJ2000Deg: 50.077,
     color: '#F4C542',
   },
   uranus: {
@@ -162,6 +168,7 @@ export const PLANET_DATA: Record<TargetBody, PlanetData> = {
     surfaceGravityMs2: 8.69,
     atmosphereType: 'thick',
     synodicPeriodDays: 369.66,
+    meanLongitudeAtJ2000Deg: 314.055,
     color: '#87CEEB',
   },
   neptune: {
@@ -176,6 +183,7 @@ export const PLANET_DATA: Record<TargetBody, PlanetData> = {
     surfaceGravityMs2: 11.15,
     atmosphereType: 'thick',
     synodicPeriodDays: 367.49,
+    meanLongitudeAtJ2000Deg: 304.349,
     color: '#4169E1',
   },
   ceres: {
@@ -190,6 +198,7 @@ export const PLANET_DATA: Record<TargetBody, PlanetData> = {
     surfaceGravityMs2: 0.28,
     atmosphereType: 'none',
     synodicPeriodDays: 466.62,
+    meanLongitudeAtJ2000Deg: 231.3,
     color: '#808080',
   },
   vesta: {
@@ -204,6 +213,7 @@ export const PLANET_DATA: Record<TargetBody, PlanetData> = {
     surfaceGravityMs2: 0.25,
     atmosphereType: 'none',
     synodicPeriodDays: 577.26,
+    meanLongitudeAtJ2000Deg: 275.4,
     color: '#A9A9A9',
   },
 }
@@ -215,4 +225,5 @@ export const EARTH_ORBITAL_DATA = {
   orbitalPeriodDays: 365.25,
   mu: 3.986004418e5, // km³/s²
   radiusKm: 6371.0,
+  meanLongitudeAtJ2000Deg: 100.464,
 }
