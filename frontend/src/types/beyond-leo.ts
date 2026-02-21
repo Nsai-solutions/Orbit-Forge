@@ -71,6 +71,7 @@ export type TargetBody =
 
 export type InterplanetaryMissionType = 'flyby' | 'orbiter' | 'lander'
 export type InterplanetaryTransferType = 'hohmann' | 'lambert'
+export type ArrivalOrbitType = 'circular' | 'elliptical'
 
 export interface InterplanetaryParams {
   targetBody: TargetBody
@@ -78,6 +79,8 @@ export interface InterplanetaryParams {
   transferType: InterplanetaryTransferType
   departureAltKm: number
   arrivalOrbitAltKm: number
+  arrivalOrbitType: ArrivalOrbitType
+  captureApoFactor: number // apoapsis as multiple of body radius (e.g., 20 = 20 Rj)
   departureDateISO: string
   arrivalDateISO: string
   spacecraftMassKg: number
@@ -139,12 +142,31 @@ export const DEFAULT_LUNAR_PARAMS: LunarParams = {
   propellantMassKg: 100,
 }
 
+/** Per-body default arrival orbit configs */
+export const BODY_ARRIVAL_DEFAULTS: Record<TargetBody, {
+  altKm: number
+  orbitType: ArrivalOrbitType
+  apoFactor: number
+}> = {
+  mercury:  { altKm: 200,  orbitType: 'circular',    apoFactor: 1 },
+  venus:    { altKm: 300,  orbitType: 'circular',    apoFactor: 1 },
+  mars:     { altKm: 300,  orbitType: 'circular',    apoFactor: 1 },
+  jupiter:  { altKm: 2000, orbitType: 'elliptical',  apoFactor: 20 },
+  saturn:   { altKm: 2000, orbitType: 'elliptical',  apoFactor: 20 },
+  uranus:   { altKm: 1000, orbitType: 'elliptical',  apoFactor: 15 },
+  neptune:  { altKm: 1000, orbitType: 'elliptical',  apoFactor: 15 },
+  ceres:    { altKm: 100,  orbitType: 'circular',    apoFactor: 1 },
+  vesta:    { altKm: 100,  orbitType: 'circular',    apoFactor: 1 },
+}
+
 export const DEFAULT_INTERPLANETARY_PARAMS: InterplanetaryParams = {
   targetBody: 'mars',
   missionType: 'orbiter',
   transferType: 'hohmann',
   departureAltKm: 400,
   arrivalOrbitAltKm: 300,
+  arrivalOrbitType: 'circular',
+  captureApoFactor: 1,
   departureDateISO: '2026-07-01T00:00:00.000Z',
   arrivalDateISO: '2027-01-15T00:00:00.000Z',
   spacecraftMassKg: 500,

@@ -50,6 +50,11 @@ export default function InterplanetaryDisplay() {
             value={result.arrivalInsertionDeltaVms.toFixed(0)}
             unit="m/s"
           />
+          {result.arrivalInsertionDeltaVms > 10000 && params.arrivalOrbitType !== 'elliptical' && (
+            <div className="col-span-2 text-[10px] text-amber-400/90 bg-amber-400/10 px-2 py-1.5 rounded">
+              Very high insertion ΔV — consider using an elliptical capture orbit to reduce propellant requirements.
+            </div>
+          )}
           <DataReadout
             label="Total ΔV"
             value={result.totalDeltaVms.toFixed(0)}

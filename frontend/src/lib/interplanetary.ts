@@ -65,7 +65,7 @@ export function computeDepartureDeltaV(departureAltKm: number, vInfKms: number):
 }
 
 /**
- * Arrival orbit insertion ΔV at target planet
+ * Arrival orbit insertion ΔV at target planet — circular orbit
  * Hyperbolic arrival: v_arrival = sqrt(v_inf² + 2μ/r)
  * ΔV = v_arrival - v_circular
  */
@@ -79,6 +79,28 @@ export function computeArrivalInsertionDeltaV(
   const vCirc = Math.sqrt(planet.mu / rTarget) // km/s
   const vArrival = Math.sqrt(vInfKms * vInfKms + 2 * planet.mu / rTarget) // km/s
   return (vArrival - vCirc) * 1000 // m/s
+}
+
+/**
+ * Arrival orbit insertion ΔV — elliptical capture orbit
+ * Burns at periapsis to capture into an elliptical orbit with given apoapsis
+ * Much lower DV than circular for gas giants
+ */
+export function computeEllipticalCaptureInsertionDeltaV(
+  target: TargetBody,
+  periapsisAltKm: number,
+  captureApoFactor: number, // apoapsis as multiple of body radius
+  vInfKms: number,
+): number {
+  const planet = PLANET_DATA[target]
+  const rPeri = planet.radiusKm + periapsisAltKm  // periapsis radius
+  const rApo = planet.radiusKm * captureApoFactor // apoapsis radius
+  const aEllip = (rPeri + rApo) / 2               // semi-major axis
+
+  const vHypPeri = Math.sqrt(vInfKms * vInfKms + 2 * planet.mu / rPeri) // hyperbolic periapsis velocity
+  const vPeriEllip = Math.sqrt(planet.mu * (2 / rPeri - 1 / aEllip))    // elliptical orbit periapsis velocity
+
+  return (vHypPeri - vPeriEllip) * 1000 // m/s
 }
 
 /**
@@ -161,14 +183,15 @@ export function solveLambert(
   if (Math.abs(A) < 1e-10) return null
 
   // Stumpff functions and universal variable iteration
-  let z = 0 // initial guess
-  const maxIter = 50
+  // Start at z = 0 (parabolic); the finite-difference derivative converges reliably from here
+  let z = 0
+  const maxIter = 100
   const tol = 1e-8
+  const sqrtMu = Math.sqrt(mu)
 
   for (let iter = 0; iter < maxIter; iter++) {
     const { c2, c3 } = stumpff(z)
 
-    const sqrtMu = Math.sqrt(mu)
     const y = r1Mag + r2Mag + A * (z * c3 - 1) / Math.sqrt(c2)
 
     if (y < 0) {
@@ -178,14 +201,6 @@ export function solveLambert(
 
     const x = Math.sqrt(y / c2)
     const tCalc = (x * x * x * c3 + A * Math.sqrt(y)) / sqrtMu
-
-    const dTdz = (() => {
-      if (Math.abs(z) > 1e-6) {
-        return (x * x * x * (c2 - 3 * c3 / (2 * c2)) / (2 * z) +
-          (3 * c3 * Math.sqrt(y)) / (8 * c2) + A * Math.sqrt(c2 / y) * (1 - z * c3 / c2) / (2 * c2)) / sqrtMu
-      }
-      return (Math.sqrt(2) * y * y * y / 2 / 40 + A * (Math.sqrt(y) + A * Math.sqrt(1 / (2 * y)))) / sqrtMu / 8
-    })()
 
     const err = tCalc - tofS
     if (Math.abs(err) < tol) {
@@ -208,7 +223,30 @@ export function solveLambert(
       return { vDepart: v1, vArrive: v2 }
     }
 
-    z -= err / Math.max(Math.abs(dTdz), 1e-20)
+    // dT/dz via finite difference — robust for all z values
+    const dz = 1e-4
+    const zPlus = z + dz
+    const { c2: c2p, c3: c3p } = stumpff(zPlus)
+    const yPlus = r1Mag + r2Mag + A * (zPlus * c3p - 1) / Math.sqrt(c2p)
+    if (yPlus < 0) {
+      z += 0.5
+      continue
+    }
+    const xPlus = Math.sqrt(yPlus / c2p)
+    const tPlus = (xPlus * xPlus * xPlus * c3p + A * Math.sqrt(yPlus)) / sqrtMu
+    const dTdz = (tPlus - tCalc) / dz
+
+    if (Math.abs(dTdz) < 1e-30) {
+      z += 0.1
+      continue
+    }
+
+    const step = err / dTdz
+    // Limit Newton step to prevent wild jumps
+    const maxStep = 5
+    z -= Math.max(-maxStep, Math.min(step, maxStep))
+    // Clamp z to reasonable range for single-revolution transfers
+    z = Math.max(-50, Math.min(z, 200))
   }
 
   return null // failed to converge
@@ -355,7 +393,14 @@ export function computeInterplanetaryResult(params: InterplanetaryParams): Inter
   }
 
   const departureDeltaVms = computeDepartureDeltaV(departureAltKm, vInfDepart)
-  const arrivalInsertionDeltaVms = computeArrivalInsertionDeltaV(targetBody, arrivalOrbitAltKm, vInfArrive)
+
+  // Compute arrival insertion DV based on orbit type
+  const arrivalOrbitType = params.arrivalOrbitType ?? 'circular'
+  const captureApoFactor = params.captureApoFactor ?? 1
+
+  const arrivalInsertionDeltaVms = arrivalOrbitType === 'elliptical' && captureApoFactor > 1
+    ? computeEllipticalCaptureInsertionDeltaV(targetBody, arrivalOrbitAltKm, captureApoFactor, vInfArrive)
+    : computeArrivalInsertionDeltaV(targetBody, arrivalOrbitAltKm, vInfArrive)
   const totalDeltaVms = departureDeltaVms + arrivalInsertionDeltaVms
 
   // Communications (at opposition: closest approach ≈ |r2 - r1|)
