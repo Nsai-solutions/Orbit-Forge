@@ -189,18 +189,13 @@ export function generateLunarTransferArc(
   numPoints = 80,
 ): Array<{ x: number; y: number; z: number }> {
   const rPark = (R_EARTH_EQUATORIAL + departureAltKm) / LUNAR_SCENE_SCALE
-  const moonDist = MOON_SEMI_MAJOR_AXIS / LUNAR_SCENE_SCALE // 0.961
-
-  // Semi-minor axis for visible curvature (~12% of transfer distance)
-  const b = moonDist * 0.12
-
+  const moonDist = MOON_SEMI_MAJOR_AXIS / LUNAR_SCENE_SCALE
+  const semiMinor = moonDist * 0.12
   const points: Array<{ x: number; y: number; z: number }> = []
   for (let i = 0; i <= numPoints; i++) {
-    const theta = (i / numPoints) * Math.PI // 0 to π for half ellipse
-    // Parametric half-ellipse: x sweeps from rPark to moonDist
-    const x = rPark + (moonDist - rPark) * (1 - Math.cos(theta)) / 2
-    // Curves below the Earth-Moon line
-    const z = -b * Math.sin(theta)
+    const t = i / numPoints
+    const x = rPark + (moonDist - rPark) * t
+    const z = -semiMinor * Math.sin(t * Math.PI)
     points.push({ x, y: 0, z })
   }
   return points
@@ -227,76 +222,50 @@ export function generateFlybyPath(
   closestApproachKm = 200,
   numPoints = 120,
 ): PhasedTrajectory {
-  const rPark = (R_EARTH_EQUATORIAL + departureAltKm) / LUNAR_SCENE_SCALE
   const moonX = MOON_SEMI_MAJOR_AXIS / LUNAR_SCENE_SCALE
-
-  // Flyby closest approach must be OUTSIDE the visual Moon sphere.
-  // Exaggerate the CA altitude proportionally (like orbit ring exaggeration)
-  // so the arc is clearly visible outside the Moon.
-  const caRatio = closestApproachKm / R_MOON // e.g., 200/1737 ≈ 0.115
+  const caRatio = closestApproachKm / R_MOON
   const flybyR = VISUAL_MOON_R * (1 + Math.max(caRatio * 20, 0.8))
-
   const approach: Vec3[] = []
   const nearMoon: Vec3[] = []
   const departure: Vec3[] = []
 
-  // Phase 1: Inbound transfer arc — half-ellipse curving toward Moon
-  const inboundN = Math.floor(numPoints * 0.6)
-  for (let i = 0; i <= inboundN; i++) {
-    const t = i / inboundN
-    const theta = t * Math.PI * 0.95
-    const r = rPark + (moonX - rPark) * (1 - Math.cos(theta)) / 2
-    approach.push({
-      x: r * Math.cos(theta * 0.6),
-      y: 0,
-      z: -r * Math.sin(theta * 0.6),
-    })
+  const approachN = Math.floor(numPoints * 0.5)
+  const approachEndX = moonX - flybyR * 2
+  const approachCurve = moonX * 0.08
+  for (let i = 0; i <= approachN; i++) {
+    const t = i / approachN
+    approach.push({ x: t * approachEndX, y: 0, z: -approachCurve * Math.sin(t * Math.PI * 0.5) })
   }
 
-  // Phase 2: Hyperbolic flyby — smooth deflection ~60° past Moon
-  // The arc passes OUTSIDE the Moon at flybyR from Moon center
-  const flybyN = Math.floor(numPoints * 0.2)
-  const lastInbound = approach[approach.length - 1]
-  nearMoon.push({ ...lastInbound })
-  const approachAngle = Math.atan2(lastInbound.z, lastInbound.x - moonX)
-  const deflectionAngle = Math.PI * 0.6
-
+  const flybyN = Math.floor(numPoints * 0.25)
+  const arcStartAngle = Math.PI * 0.85
+  const arcEndAngle = -Math.PI * 0.15
   let closestApproach: Vec3 | null = null
-  let minDist = Infinity
-
-  for (let i = 1; i <= flybyN; i++) {
+  let minDistFromMoon = Infinity
+  nearMoon.push({ ...approach[approach.length - 1] })
+  for (let i = 0; i <= flybyN; i++) {
     const t = i / flybyN
-    const angle = approachAngle + t * deflectionAngle
-    // Distance varies: closest at t=0.5, farther at start/end
-    const distFromMoon = flybyR + flybyR * 2 * Math.pow(Math.abs(t - 0.5) * 2, 1.5)
-    const pt: Vec3 = {
-      x: moonX + distFromMoon * Math.cos(angle),
-      y: 0,
-      z: distFromMoon * Math.sin(angle),
-    }
+    const angle = arcStartAngle + t * (arcEndAngle - arcStartAngle)
+    const periapsisFactor = 1 + 1.5 * Math.pow(2 * Math.abs(t - 0.5), 2)
+    const dist = flybyR * periapsisFactor
+    const pt: Vec3 = { x: moonX + dist * Math.cos(angle), y: 0, z: dist * Math.sin(angle) }
     nearMoon.push(pt)
-    if (distFromMoon < minDist) {
-      minDist = distFromMoon
-      closestApproach = { ...pt }
-    }
+    if (dist < minDistFromMoon) { minDistFromMoon = dist; closestApproach = { ...pt } }
   }
 
-  // Phase 3: Outgoing leg — continuing past Moon away from Earth
-  const outN = numPoints - inboundN - flybyN
+  const departN = numPoints - approachN - flybyN
   const lastFlyby = nearMoon[nearMoon.length - 1]
   departure.push({ ...lastFlyby })
-  const outAngle = Math.atan2(lastFlyby.z, lastFlyby.x - moonX)
-  const outSpeed = 0.012
-
-  for (let i = 1; i <= outN; i++) {
-    const t = i / outN
-    const curveAngle = outAngle + t * 0.3
-    const dist = t * outSpeed * outN
-    departure.push({
-      x: lastFlyby.x + dist * Math.cos(curveAngle),
-      y: 0,
-      z: lastFlyby.z + dist * Math.sin(curveAngle),
-    })
+  const prevPt = nearMoon[nearMoon.length - 2]
+  const dirX = lastFlyby.x - prevPt.x
+  const dirZ = lastFlyby.z - prevPt.z
+  const dirMag = Math.sqrt(dirX * dirX + dirZ * dirZ)
+  const normDirX = dirX / dirMag
+  const normDirZ = dirZ / dirMag
+  for (let i = 1; i <= departN; i++) {
+    const t = i / departN
+    const dist = t * moonX * 0.5
+    departure.push({ x: lastFlyby.x + dist * normDirX, y: 0, z: lastFlyby.z + dist * normDirZ - t * t * 0.05 })
   }
 
   return { approach, nearMoon, departure, closestApproach, earthReturn: null }
@@ -310,83 +279,47 @@ export function generateFreeReturnTrajectory(
   departureAltKm: number,
   numPoints = 160,
 ): PhasedTrajectory {
-  const rPark = (R_EARTH_EQUATORIAL + departureAltKm) / LUNAR_SCENE_SCALE
   const moonX = MOON_SEMI_MAJOR_AXIS / LUNAR_SCENE_SCALE
-  // Use visual Moon radius so swing-by arc stays outside the enlarged Moon sphere
   const caRatio = 150 / R_MOON
   const swingbyR = VISUAL_MOON_R * (1 + Math.max(caRatio * 20, 0.8))
-
   const approach: Vec3[] = []
   const nearMoon: Vec3[] = []
   const departure: Vec3[] = []
+  const loopHeight = moonX * 0.25
 
-  // Phase 1: Outbound leg (Earth → Moon) — parametric elliptical shape
-  const outboundN = Math.floor(numPoints * 0.35)
-  for (let i = 0; i <= outboundN; i++) {
-    const t = i / outboundN
-    const theta = t * Math.PI * 0.85
-    const r = rPark + (moonX - rPark) * (1 - Math.cos(theta)) / 2
-    approach.push({
-      x: r * Math.cos(theta * 0.55),
-      y: 0,
-      z: r * Math.sin(theta * 0.55) * 0.35,
-    })
+  const outN = Math.floor(numPoints * 0.38)
+  for (let i = 0; i <= outN; i++) {
+    const t = i / outN
+    const x = t * (moonX - swingbyR * 2)
+    const z = loopHeight * Math.sin(t * Math.PI * 0.9)
+    approach.push({ x, y: 0, z })
   }
 
-  // Phase 2: Swing-by around the far side of the Moon
-  const swingN = Math.floor(numPoints * 0.15)
-  const swingStartAngle = Math.PI * 0.35
-  const swingEndAngle = -Math.PI * 0.35
-
+  const swingN = Math.floor(numPoints * 0.14)
   nearMoon.push({ ...approach[approach.length - 1] })
-
+  const swingStart = Math.PI * 0.6
+  const swingEnd = -Math.PI * 0.6
   let closestApproach: Vec3 | null = null
   let minDist = Infinity
-
   for (let i = 1; i <= swingN; i++) {
     const t = i / swingN
-    const angle = swingStartAngle - t * (swingStartAngle - swingEndAngle + Math.PI)
-    const periProgress = Math.sin(t * Math.PI)
-    const dist = swingbyR * 3 - swingbyR * 2 * periProgress
-    const pt: Vec3 = {
-      x: moonX + dist * Math.cos(angle),
-      y: 0,
-      z: dist * Math.sin(angle),
-    }
+    const angle = swingStart + t * (swingEnd - swingStart)
+    const periFactor = 1 + 2.0 * Math.pow(2 * Math.abs(t - 0.5), 2)
+    const dist = swingbyR * periFactor
+    const pt: Vec3 = { x: moonX + dist * Math.cos(angle), y: 0, z: dist * Math.sin(angle) }
     nearMoon.push(pt)
-    if (dist < minDist) {
-      minDist = dist
-      closestApproach = { ...pt }
-    }
+    if (dist < minDist) { minDist = dist; closestApproach = { ...pt } }
   }
 
-  // Phase 3: Return leg (Moon → Earth) via Bézier curve
-  const returnN = numPoints - outboundN - swingN
-  const lastSwing = nearMoon[nearMoon.length - 1]
-  departure.push({ ...lastSwing })
-
-  for (let i = 1; i <= returnN; i++) {
-    const t = i / returnN
-    const earthX = 0.02
-    const earthZ = -0.01
-
-    const cp1x = lastSwing.x - 0.15
-    const cp1z = lastSwing.z - 0.25
-    const cp2x = 0.3
-    const cp2z = -0.2
-
-    const u = t
-    const u2 = u * u
-    const u3 = u2 * u
-    const mt = 1 - u
-    const mt2 = mt * mt
-    const mt3 = mt2 * mt
-
-    departure.push({
-      x: mt3 * lastSwing.x + 3 * mt2 * u * cp1x + 3 * mt * u2 * cp2x + u3 * earthX,
-      y: 0,
-      z: mt3 * lastSwing.z + 3 * mt2 * u * cp1z + 3 * mt * u2 * cp2z + u3 * earthZ,
-    })
+  const retN = numPoints - outN - swingN
+  const swingEnd_pt = nearMoon[nearMoon.length - 1]
+  departure.push({ ...swingEnd_pt })
+  for (let i = 1; i <= retN; i++) {
+    const t = i / retN
+    const x = swingEnd_pt.x - t * swingEnd_pt.x
+    const returnBulge = -loopHeight * Math.sin(t * Math.PI * 0.85)
+    const z = swingEnd_pt.z * (1 - t) + returnBulge * t
+    departure.push({ x, y: 0, z })
   }
 
   const earthReturn = departure[departure.length - 1]

@@ -359,7 +359,6 @@ export function computeInterplanetaryResult(params: InterplanetaryParams): Inter
     vInfArrive = hohmann.vInfArrive
     transferTimeDays = hohmann.transferTimeDays
   } else {
-    // Lambert — use actual dates
     const depDate = new Date(departureDateISO)
     const arrDate = new Date(arrivalDateISO)
     const r1 = computeEarthPosition(depDate)
@@ -367,28 +366,41 @@ export function computeInterplanetaryResult(params: InterplanetaryParams): Inter
     const tofS = (arrDate.getTime() - depDate.getTime()) / 1000
     transferTimeDays = tofS / 86400
 
-    const result = solveLambert(r1, r2, tofS, MU_SUN)
-    if (result) {
-      // Compute v-infinity at Earth
+    const computeC3FromResult = (result: ReturnType<typeof solveLambert>, r1pos: typeof r1) => {
+      if (!result) return Infinity
+      const rE = Math.sqrt(r1pos.x * r1pos.x + r1pos.z * r1pos.z)
+      const vEarthOrb = Math.sqrt(MU_SUN / rE)
+      const vEx = -vEarthOrb * r1pos.z / rE
+      const vEz = vEarthOrb * r1pos.x / rE
+      const dvx = result.vDepart.x - vEx
+      const dvz = result.vDepart.z - vEz
+      return dvx * dvx + dvz * dvz
+    }
+
+    const resultShort = solveLambert(r1, r2, tofS, MU_SUN, true)
+    const resultLong = solveLambert(r1, r2, tofS, MU_SUN, false)
+    const c3Short = computeC3FromResult(resultShort, r1)
+    const c3Long = computeC3FromResult(resultLong, r1)
+    const bestResult = c3Short <= c3Long ? resultShort : resultLong
+
+    if (bestResult) {
       const rE = Math.sqrt(r1.x * r1.x + r1.z * r1.z)
       const vEarthOrb = Math.sqrt(MU_SUN / rE)
       const vEx = -vEarthOrb * r1.z / rE
       const vEz = vEarthOrb * r1.x / rE
-      const dvx = result.vDepart.x - vEx
-      const dvz = result.vDepart.z - vEz
+      const dvx = bestResult.vDepart.x - vEx
+      const dvz = bestResult.vDepart.z - vEz
       vInfDepart = Math.sqrt(dvx * dvx + dvz * dvz)
       c3Km2s2 = vInfDepart * vInfDepart
 
-      // Arrival v-infinity
       const rT = Math.sqrt(r2.x * r2.x + r2.z * r2.z)
       const vTOrb = Math.sqrt(MU_SUN / rT)
       const vTx = -vTOrb * r2.z / rT
       const vTz = vTOrb * r2.x / rT
-      const avx = result.vArrive.x - vTx
-      const avz = result.vArrive.z - vTz
+      const avx = bestResult.vArrive.x - vTx
+      const avz = bestResult.vArrive.z - vTz
       vInfArrive = Math.sqrt(avx * avx + avz * avz)
     } else {
-      // Lambert failed — fall back to Hohmann
       const hohmann = computeHohmannInterplanetary(targetBody)
       c3Km2s2 = hohmann.c3
       vInfDepart = hohmann.vInfDepart
