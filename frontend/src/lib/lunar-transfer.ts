@@ -214,6 +214,7 @@ export interface PhasedTrajectory {
   nearMoon: Vec3[]
   departure: Vec3[]
   closestApproach: Vec3 | null
+  closestApproachKm: number // actual CA altitude in km, computed from trajectory
   earthReturn: Vec3 | null // free-return re-entry point
 }
 
@@ -234,11 +235,12 @@ export function generateFlybyPath(
   const flybyR = VISUAL_MOON_R * (1 + Math.max(caRatio * 20, 0.8))
 
   // === Single cubic Bézier from Earth to past Moon ===
-  // Control points hug the E-M line so the curve passes close to the Moon
+  // P1.z negative (approach from below E-M line), P2.z positive (depart above)
+  // creates visible S-curve deflection. P2.x past moonX ensures far-side pass.
   const P0x = rPark, P0z = 0
-  const P1x = moonX * 0.4, P1z = -moonX * 0.03
-  const P2x = moonX * 1.1, P2z = -moonX * 0.02
-  const P3x = moonX + 0.5, P3z = moonX * 0.12
+  const P1x = moonX * 0.45, P1z = -moonX * 0.15
+  const P2x = moonX * 1.05, P2z = moonX * 0.15
+  const P3x = moonX + 0.4, P3z = moonX * 0.25
 
   // Generate all points on one Bézier
   const allPoints: Vec3[] = []
@@ -298,7 +300,8 @@ export function generateFlybyPath(
     departure.push(allPoints[allPoints.length - 1])
   }
 
-  return { approach, nearMoon, departure, closestApproach, earthReturn: null }
+  const caDistKm = Math.max(0, minDist * LUNAR_SCENE_SCALE - R_MOON)
+  return { approach, nearMoon, departure, closestApproach, closestApproachKm: caDistKm, earthReturn: null }
 }
 
 /**
@@ -405,7 +408,10 @@ export function generateFreeReturnTrajectory(
   }
 
   const earthReturn = departure[departure.length - 1]
-  return { approach, nearMoon, departure, closestApproach, earthReturn }
+  const caDistKm = closestApproach
+    ? Math.max(0, Math.sqrt((closestApproach.x - moonX) ** 2 + closestApproach.z ** 2) * LUNAR_SCENE_SCALE - R_MOON)
+    : 0
+  return { approach, nearMoon, departure, closestApproach, closestApproachKm: caDistKm, earthReturn }
 }
 
 /**

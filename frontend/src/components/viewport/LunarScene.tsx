@@ -238,7 +238,7 @@ export default function LunarScene() {
             <AnnotationLabel
               position={toTuple(flybyPhases.closestApproach)}
               color="#FFFFFF"
-              text="CA: 200 km"
+              text={`CA: ${Math.round(flybyPhases.closestApproachKm)} km`}
               offsetY={-14}
             />
           )}
@@ -261,7 +261,7 @@ export default function LunarScene() {
             <AnnotationLabel
               position={toTuple(freeReturnPhases.closestApproach)}
               color="#FFFFFF"
-              text="CA: 150 km"
+              text={`CA: ${Math.round(freeReturnPhases.closestApproachKm)} km`}
               offsetY={-14}
             />
           )}
