@@ -237,14 +237,15 @@ export function generateFlybyPath(
   const nearMoon: Vec3[] = []
   const departure: Vec3[] = []
 
-  // === Phase 1: Approach — uses sin(1.5π*t) so it arrives at Moon offset in -z ===
+  // === Phase 1: Approach — simple half-ellipse (same as generateLunarTransferArc) ===
   const inboundN = Math.floor(numPoints * 0.50)
   const approachBulge = moonX * 0.12
 
   for (let i = 0; i <= inboundN; i++) {
     const t = i / inboundN
-    const x = rPark + (moonX - rPark) * t
-    const z = approachBulge * Math.sin(1.5 * Math.PI * t)
+    const theta = t * Math.PI * 0.92 // stop at 92% to hand off before reaching Moon
+    const x = rPark + (moonX - rPark) * (1 - Math.cos(theta)) / 2
+    const z = -approachBulge * Math.sin(theta) // simple curve below E-M line
     approach.push({ x, y: 0, z })
   }
 
@@ -263,8 +264,8 @@ export function generateFlybyPath(
   // Approach angle from Moon center
   const approachAngle = Math.atan2(lastApproach.z, lastApproach.x - moonX)
 
-  // Deflection: ~60 degrees for visible curve
-  const deflection = (60 * Math.PI) / 180
+  // Deflection: 40 degrees for a gentle curve
+  const deflection = (40 * Math.PI) / 180
   const exitAngle = approachAngle + deflection
 
   // Periapsis at midpoint of angular sweep
@@ -289,7 +290,7 @@ export function generateFlybyPath(
   const departTanX = tnx * Math.cos(deflection) - tnz * Math.sin(deflection)
   const departTanZ = tnx * Math.sin(deflection) + tnz * Math.cos(deflection)
 
-  const arm = jDist * 0.45
+  const arm = jDist * 0.6 // long arm for smoother, more gradual curvature
 
   // Segment 1: approach → periapsis
   const seg1N = Math.floor(flybyN / 2)
@@ -329,19 +330,19 @@ export function generateFlybyPath(
     if (dFromMoon < minDist) { minDist = dFromMoon; closestApproach = { ...pt } }
   }
 
-  // === Phase 3: Departure — continues past Moon ===
+  // === Phase 3: Departure — smooth continuation ===
   const outN = numPoints - inboundN - flybyN
   const lastFlyby = nearMoon[nearMoon.length - 1]
   departure.push({ ...lastFlyby })
 
   for (let i = 1; i <= outN; i++) {
     const t = i / outN
-    const dist = t * 0.4
-    const spread = t * t * 0.06
+    // Gradually curve away — use t^0.7 for gentler initial acceleration
+    const dist = Math.pow(t, 0.7) * 0.5
     departure.push({
-      x: lastFlyby.x + dist * departTanX + spread * departTanX,
+      x: lastFlyby.x + dist * departTanX,
       y: 0,
-      z: lastFlyby.z + dist * departTanZ + spread * departTanZ,
+      z: lastFlyby.z + dist * departTanZ,
     })
   }
 
@@ -389,12 +390,15 @@ export function generateFreeReturnTrajectory(
   // End angle: mirror across x-axis (return departs from +z side)
   const endAngle = -startAngle
 
-  // Sweep: must go through the FAR side of Moon (angle 0 = +x direction from Moon)
-  // From negative z (below) clockwise through far side to positive z (above)
+  // We need to sweep through the FAR side of Moon (angle = 0 from Moon = +x direction)
+  // startAngle should be negative (outbound arrives below E-M line, z < 0)
+  // endAngle should be positive (return departs above E-M line, z > 0)
+  // So we sweep counterclockwise: negative angle → 0 (far side) → positive angle
   let totalSweep = endAngle - startAngle
-  // Ensure we go the long way around through the far side
-  if (totalSweep > 0 && totalSweep < Math.PI) totalSweep -= 2 * Math.PI
-  if (totalSweep < 0 && totalSweep > -Math.PI) totalSweep += 2 * Math.PI
+  // If sweep is negative, add 2π to go the long way (counterclockwise through far side)
+  if (totalSweep < 0) totalSweep += 2 * Math.PI
+  // If sweep is greater than 1.5π, we're going the wrong way (through near side)
+  if (totalSweep > Math.PI * 1.5) totalSweep -= 2 * Math.PI
 
   nearMoon.push({ ...outEnd })
   let closestApproach: Vec3 | null = null
@@ -403,11 +407,12 @@ export function generateFreeReturnTrajectory(
   for (let i = 1; i <= swingN; i++) {
     const t = i / swingN
     const angle = startAngle + t * totalSweep
-    // Distance varies: farthest at edges (connecting to transfer arcs), closest at periapsis
+
+    // Distance from Moon center: closest at midpoint, farther at edges
     const periProgress = Math.sin(t * Math.PI)
-    // At periapsis: swingbyR, at edges: overshoot distance from Moon center
+    // Smoothly interpolate between edge distance and periapsis distance
     const edgeDist = Math.sqrt((outEnd.x - moonX) ** 2 + outEnd.z ** 2)
-    const dist = edgeDist - (edgeDist - swingbyR) * periProgress
+    const dist = edgeDist * (1 - periProgress) + swingbyR * periProgress
 
     const pt: Vec3 = {
       x: moonX + dist * Math.cos(angle),
