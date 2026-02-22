@@ -320,21 +320,24 @@ function propagateTrajectory(
  * Find the velocity adjustment that achieves a target closest approach.
  * Uses bisection search on the vz offset from Hohmann velocity.
  * More negative vzAdj = faster TLI = closer approach to Moon.
+ * Monotonic region: [0, -0.003] km/s where CA decreases smoothly from ~2384 km to ~0.
  */
 function findVzForCA(departureAltKm: number, targetCAKm: number, maxDays: number): number {
-  // Search only in the negative range (faster than Hohmann)
-  let lo = -0.05   // -50 m/s (very close approach)
-  let hi = 0        // 0 m/s (Hohmann, ~2384 km CA)
+  // Monotonic region only: 0 (Hohmann, ~2384 km CA) to -3 m/s (very close/crash)
+  // Beyond -3 m/s the spacecraft overshoots the Moon and CA increases again (non-monotonic)
+  let lo = 0        // far side — Hohmann, CA ≈ 2384 km
+  let hi = -0.003   // close side — ~3 m/s faster, near-crash
 
   for (let iter = 0; iter < 40; iter++) {
     const mid = (lo + hi) / 2
-    const result = propagateTrajectory(departureAltKm, mid, maxDays, 30, 1)
+    // Large sampleInterval — we only need closestApproachKm, not trajectory points
+    const result = propagateTrajectory(departureAltKm, mid, maxDays, 30, 10000)
     if (result.closestApproachKm < targetCAKm) {
-      // Too close → need less speed → make vzAdj less negative
-      lo = mid
-    } else {
-      // Too far → need more speed → make vzAdj more negative
+      // Too close or crash → need less speed → move toward 0 (slower)
       hi = mid
+    } else {
+      // Too far → need more speed → move toward -0.003 (faster)
+      lo = mid
     }
   }
   return (lo + hi) / 2
@@ -355,9 +358,9 @@ export function generateLunarTransferArc(
     Math.max(1, Math.floor(5 * 86400 / 30 / numPoints)))
 
   // Stop when within the visual orbit ring radius
-  // The orbit ring is drawn at the same enlarged scale as the Moon sphere
-  const visualScale = VISUAL_MOON_R / (R_MOON / LUNAR_SCENE_SCALE)
-  const orbitRingScene = (R_MOON + targetOrbitAltKm) / LUNAR_SCENE_SCALE * visualScale
+  // Must match LunarScene.tsx formula: orbitR = visualMoonR * (1 + max(altRatio * 25, 1.2))
+  const altRatio = targetOrbitAltKm / R_MOON
+  const orbitRingScene = VISUAL_MOON_R * (1 + Math.max(altRatio * 25, 1.2))
   const stopDist = orbitRingScene * 1.05  // stop just outside the ring
 
   let endIdx = result.points.length
