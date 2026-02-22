@@ -234,11 +234,11 @@ export function generateFlybyPath(
   const flybyR = VISUAL_MOON_R * (1 + Math.max(caRatio * 20, 0.8))
 
   // === Single cubic Bézier from Earth to past Moon ===
-  // One smooth curve — no phase junctions, no kinks, no loops
+  // Control points hug the E-M line so the curve passes close to the Moon
   const P0x = rPark, P0z = 0
-  const P1x = moonX * 0.5, P1z = -moonX * 0.05
-  const P2x = moonX * 0.8, P2z = moonX * 0.08
-  const P3x = moonX + 0.5, P3z = moonX * 0.18
+  const P1x = moonX * 0.4, P1z = -moonX * 0.03
+  const P2x = moonX * 1.1, P2z = -moonX * 0.02
+  const P3x = moonX + 0.5, P3z = moonX * 0.12
 
   // Generate all points on one Bézier
   const allPoints: Vec3[] = []
