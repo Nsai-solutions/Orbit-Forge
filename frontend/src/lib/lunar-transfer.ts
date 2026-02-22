@@ -250,13 +250,18 @@ export function generateLunarTransferArc(
   numPoints = 80,
 ): Array<{ x: number; y: number; z: number }> {
   const { p, e } = computeTransferElements(departureAltKm)
-  // Stop just short of apogee so the arc doesn't overshoot into the Moon / orbit ring
-  const nuEnd = Math.PI * 0.98
+  // Stop when the arc reaches close to the Moon's visual orbit ring
+  const stopDistScene = VISUAL_MOON_R * 2.5
+  const nuEnd = Math.PI
   const points: Array<{ x: number; y: number; z: number }> = []
   for (let i = 0; i <= numPoints; i++) {
     const nu = (i / numPoints) * nuEnd
     const r = keplerRadius(nu, p, e)
-    points.push(transferToScene(nu, r, Math.PI))
+    const pt = transferToScene(nu, r, Math.PI)
+    points.push(pt)
+    // Check if we've reached close enough to the Moon
+    const distFromMoon = Math.sqrt((pt.x - MOON_X_SCENE) ** 2 + pt.z ** 2)
+    if (distFromMoon <= stopDistScene && i > numPoints * 0.5) break
   }
   return points
 }
@@ -332,7 +337,8 @@ export function generateFlybyPath(
   const incomingAsymAngle = Math.PI - nuMax
 
   // Rotate so incoming asymptote aligns with arrival direction
-  const thetaRot = arrivalAngle - incomingAsymAngle
+  // +π flips periapsis to the far side of the Moon (away from Earth)
+  const thetaRot = arrivalAngle - incomingAsymAngle + Math.PI
   console.log('[FLYBY] NEW thetaRot (deg)=', thetaRot * 180 / Math.PI)
 
   // ─── STEP 2: Debug periapsis point through hyperbolaToScene ───
@@ -384,15 +390,21 @@ export function generateFlybyPath(
     departure.push(hyperbolaToScene(rH * Math.cos(nu), rH * Math.sin(nu), thetaRot))
   }
 
-  // ─── Bridge the SOI gap: straight line from ellipse endpoint to hyperbola start ───
+  // ─── Bridge the SOI gap: arc along SOI sphere from ellipse exit to hyperbola entry ───
   const hypStart = nearMoon[0]
-  const bridgePoints = 5
-  for (let i = 1; i <= bridgePoints; i++) {
-    const t = i / (bridgePoints + 1)
+  const ellipseAngle = Math.atan2(ellipseEnd.z, ellipseEnd.x - MOON_X_SCENE)
+  const hypStartAngle = Math.atan2(hypStart.z, hypStart.x - MOON_X_SCENE)
+  const soiScene = MOON_SOI_KM / LUNAR_SCENE_SCALE
+  let angleDiff = hypStartAngle - ellipseAngle
+  if (angleDiff > Math.PI) angleDiff -= 2 * Math.PI
+  if (angleDiff < -Math.PI) angleDiff += 2 * Math.PI
+  for (let i = 1; i <= 10; i++) {
+    const t = i / 11
+    const angle = ellipseAngle + t * angleDiff
     approach.push({
-      x: ellipseEnd.x + t * (hypStart.x - ellipseEnd.x),
+      x: MOON_X_SCENE + soiScene * Math.cos(angle),
       y: 0,
-      z: ellipseEnd.z + t * (hypStart.z - ellipseEnd.z),
+      z: soiScene * Math.sin(angle),
     })
   }
 
@@ -460,7 +472,8 @@ export function generateFreeReturnTrajectory(
   const dz = ellipseEnd.z
   const arrivalAngle = Math.atan2(dz, dx)
   const incomingAsymAngle = Math.PI - nuMax
-  const thetaRot = arrivalAngle - incomingAsymAngle
+  // +π flips periapsis to the far side of the Moon (away from Earth)
+  const thetaRot = arrivalAngle - incomingAsymAngle + Math.PI
   console.log('[FREE-RET] NEW thetaRot (deg)=', thetaRot * 180 / Math.PI)
 
   // ─── Hyperbola ν-range at SOI boundary ───
@@ -480,21 +493,29 @@ export function generateFreeReturnTrajectory(
   const rCA = pHyp / (1 + eHyp)
   const closestApproach = hyperbolaToScene(rCA, 0, thetaRot)
 
-  // ─── Bridge handoff 1: straight line from ellipse endpoint to hyperbola start ───
+  // ─── Bridge handoff 1: arc along SOI sphere from ellipse exit to hyperbola entry ───
   const hypStart = nearMoon[0]
-  const bridge1Points = 5
-  for (let i = 1; i <= bridge1Points; i++) {
-    const t = i / (bridge1Points + 1)
+  const ellipseAngle = Math.atan2(ellipseEnd.z, ellipseEnd.x - MOON_X_SCENE)
+  const hypStartAngle = Math.atan2(hypStart.z, hypStart.x - MOON_X_SCENE)
+  const soiScene = MOON_SOI_KM / LUNAR_SCENE_SCALE
+  let angleDiff1 = hypStartAngle - ellipseAngle
+  if (angleDiff1 > Math.PI) angleDiff1 -= 2 * Math.PI
+  if (angleDiff1 < -Math.PI) angleDiff1 += 2 * Math.PI
+  for (let i = 1; i <= 10; i++) {
+    const t = i / 11
+    const angle = ellipseAngle + t * angleDiff1
     approach.push({
-      x: ellipseEnd.x + t * (hypStart.x - ellipseEnd.x),
+      x: MOON_X_SCENE + soiScene * Math.cos(angle),
       y: 0,
-      z: ellipseEnd.z + t * (hypStart.z - ellipseEnd.z),
+      z: soiScene * Math.sin(angle),
     })
   }
 
   // ─── Segment 3: Return transfer ellipse (SOI → Earth) ───
   // Same orbital elements, apse line rotated by deflection angle → figure-8
-  const returnOmega = Math.PI + deflection
+  // After +π flip on thetaRot, the deflection bends the other way
+  // so returnOmega = deflection (≡ Math.PI + deflection + Math.PI)
+  const returnOmega = deflection
   const returnN = numPoints - outboundN - swingN
 
   // Find SOI exit on the return ellipse (where distance to Moon = MOON_SOI_KM)
@@ -518,21 +539,24 @@ export function generateFreeReturnTrajectory(
     departure.push(transferToScene(nu, r, returnOmega))
   }
 
-  // ─── Bridge handoff 2: straight line from hyperbola end to return ellipse start ───
+  // ─── Bridge handoff 2: arc along SOI sphere from hyperbola exit to return ellipse entry ───
   const hypEnd = nearMoon[nearMoon.length - 1]
   const returnStart = departure[0]
-  const bridge2Points = 5
-  const bridge2: Vec3[] = []
-  for (let i = 1; i <= bridge2Points; i++) {
-    const t = i / (bridge2Points + 1)
-    bridge2.push({
-      x: hypEnd.x + t * (returnStart.x - hypEnd.x),
+  const hypEndAngle = Math.atan2(hypEnd.z, hypEnd.x - MOON_X_SCENE)
+  const returnStartAngle = Math.atan2(returnStart.z, returnStart.x - MOON_X_SCENE)
+  const soiScene2 = MOON_SOI_KM / LUNAR_SCENE_SCALE
+  let angleDiff2 = returnStartAngle - hypEndAngle
+  if (angleDiff2 > Math.PI) angleDiff2 -= 2 * Math.PI
+  if (angleDiff2 < -Math.PI) angleDiff2 += 2 * Math.PI
+  for (let i = 1; i <= 10; i++) {
+    const t = i / 11
+    const angle = hypEndAngle + t * angleDiff2
+    nearMoon.push({
+      x: MOON_X_SCENE + soiScene2 * Math.cos(angle),
       y: 0,
-      z: hypEnd.z + t * (returnStart.z - hypEnd.z),
+      z: soiScene2 * Math.sin(angle),
     })
   }
-  // Append bridge to nearMoon so it renders as part of the near-Moon segment
-  nearMoon.push(...bridge2)
 
   // ─── Compute CA from periapsis point (no offset — hyperbola is correctly positioned) ───
   const caDistScene = Math.sqrt(
