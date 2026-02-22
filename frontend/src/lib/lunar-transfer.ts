@@ -237,15 +237,16 @@ export function generateFlybyPath(
   const nearMoon: Vec3[] = []
   const departure: Vec3[] = []
 
-  // === Phase 1: Approach — simple half-ellipse (same as generateLunarTransferArc) ===
+  // === Phase 1: Approach — half-ellipse from Earth toward Moon ===
   const inboundN = Math.floor(numPoints * 0.50)
   const approachBulge = moonX * 0.12
 
+  // Half-ellipse stopping at 85% of arc — arrives near Moon with z-offset for Bézier handoff
   for (let i = 0; i <= inboundN; i++) {
     const t = i / inboundN
-    const theta = t * Math.PI * 0.92 // stop at 92% to hand off before reaching Moon
+    const theta = t * Math.PI * 0.85
     const x = rPark + (moonX - rPark) * (1 - Math.cos(theta)) / 2
-    const z = -approachBulge * Math.sin(theta) // simple curve below E-M line
+    const z = -approachBulge * Math.sin(theta)
     approach.push({ x, y: 0, z })
   }
 
@@ -404,15 +405,17 @@ export function generateFreeReturnTrajectory(
   let closestApproach: Vec3 | null = null
   let minDist = Infinity
 
+  const edgeDist = Math.sqrt((outEnd.x - moonX) ** 2 + outEnd.z ** 2)
+  // Periapsis distance: don't go below 40% of edge distance to avoid sharp pinch
+  const periDist = Math.max(swingbyR, edgeDist * 0.4)
+
   for (let i = 1; i <= swingN; i++) {
     const t = i / swingN
     const angle = startAngle + t * totalSweep
 
     // Distance from Moon center: closest at midpoint, farther at edges
     const periProgress = Math.sin(t * Math.PI)
-    // Smoothly interpolate between edge distance and periapsis distance
-    const edgeDist = Math.sqrt((outEnd.x - moonX) ** 2 + outEnd.z ** 2)
-    const dist = edgeDist * (1 - periProgress) + swingbyR * periProgress
+    const dist = edgeDist * (1 - periProgress) + periDist * periProgress
 
     const pt: Vec3 = {
       x: moonX + dist * Math.cos(angle),
