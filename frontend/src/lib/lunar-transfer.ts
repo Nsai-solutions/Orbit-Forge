@@ -176,32 +176,85 @@ const LUNAR_SCENE_SCALE = 400000
  *  stay outside this visual radius to avoid clipping through the sphere. */
 const VISUAL_MOON_R = Math.max(R_MOON / LUNAR_SCENE_SCALE, 0.012)
 
+/* ── Patched-conic helpers (private) ────────────────────────────── */
+
+/** Moon Hill-sphere radius (km) — boundary between Earth-dominated and Moon-dominated gravity */
+const MOON_SOI_KM = 66000
+
+/** Moon x-position in scene units */
+const MOON_X_SCENE = MOON_SEMI_MAJOR_AXIS / LUNAR_SCENE_SCALE
+
+/** Conic equation: orbital radius at true anomaly ν */
+function keplerRadius(nu: number, p: number, e: number): number {
+  return p / (1 + e * Math.cos(nu))
+}
+
+/** Transfer ellipse orbital elements from departure altitude */
+function computeTransferElements(departureAltKm: number) {
+  const rPark = R_EARTH_EQUATORIAL + departureAltKm
+  const sma = (rPark + MOON_SEMI_MAJOR_AXIS) / 2
+  const e = 1 - rPark / sma
+  const p = sma * (1 - e * e)
+  return { rPark, sma, e, p }
+}
+
+/** Perifocal-to-scene coordinate transform with argument of perigee rotation.
+ *  omegaRot = π places perigee at −x (near Earth) and apogee at +x (toward Moon). */
+function transferToScene(nu: number, r: number, omegaRot: number): Vec3 {
+  const xP = r * Math.cos(nu)
+  const zP = r * Math.sin(nu)
+  return {
+    x: (xP * Math.cos(omegaRot) - zP * Math.sin(omegaRot)) / LUNAR_SCENE_SCALE,
+    y: 0,
+    z: (xP * Math.sin(omegaRot) + zP * Math.cos(omegaRot)) / LUNAR_SCENE_SCALE,
+  }
+}
+
+/** Distance from a scene-space point to the Moon centre */
+function distToMoonScene(pt: Vec3): number {
+  return Math.sqrt((pt.x - MOON_X_SCENE) ** 2 + pt.z ** 2)
+}
+
+/** Bisection: find ν on the transfer ellipse where distance to Moon = MOON_SOI_KM.
+ *  Uses law of cosines: d² = r² + 2·r·aMoon·cos(ν) + aMoon². */
+function findSOIEntry(p: number, e: number): number {
+  let nuLo = 0
+  let nuHi = Math.PI
+  for (let i = 0; i < 50; i++) {
+    const nuMid = (nuLo + nuHi) / 2
+    const r = keplerRadius(nuMid, p, e)
+    const d2 = r * r + 2 * r * MOON_SEMI_MAJOR_AXIS * Math.cos(nuMid) + MOON_SEMI_MAJOR_AXIS ** 2
+    if (d2 > MOON_SOI_KM ** 2) nuLo = nuMid
+    else nuHi = nuMid
+  }
+  return (nuLo + nuHi) / 2
+}
+
+/** Rotate Moon-centred hyperbola coordinates by θ_rot and translate to scene space */
+function hyperbolaToScene(xH: number, zH: number, thetaRot: number): Vec3 {
+  return {
+    x: (xH * Math.cos(thetaRot) - zH * Math.sin(thetaRot)) / LUNAR_SCENE_SCALE + MOON_X_SCENE,
+    y: 0,
+    z: (xH * Math.sin(thetaRot) + zH * Math.cos(thetaRot)) / LUNAR_SCENE_SCALE,
+  }
+}
+
 /**
  * Generate lunar transfer arc for 3D rendering.
- * Uses LUNAR_SCENE_SCALE so coordinates match LunarScene.tsx exactly.
- * Earth at origin, Moon at 384400/400000 ≈ 0.961 on the x-axis.
- *
- * Shape: half-ellipse from parking orbit to Moon distance, curving below
- * the Earth-Moon line. This approximates a Hohmann transfer arc.
+ * Keplerian transfer ellipse from parking orbit to lunar distance.
+ * Earth at origin, Moon at ~0.961 on the x-axis.
  */
 export function generateLunarTransferArc(
   departureAltKm: number,
-  targetOrbitAltKm = 100,
+  _targetOrbitAltKm = 100,
   numPoints = 80,
 ): Array<{ x: number; y: number; z: number }> {
-  const rPark = (R_EARTH_EQUATORIAL + departureAltKm) / LUNAR_SCENE_SCALE
-  const moonDist = MOON_SEMI_MAJOR_AXIS / LUNAR_SCENE_SCALE
-  // End at the Earth-facing edge of the orbit ring, not Moon center
-  const altRatio = targetOrbitAltKm / R_MOON
-  const orbitR = VISUAL_MOON_R * (1 + Math.max(altRatio * 25, 1.2))
-  const endX = moonDist - orbitR
-  const semiMinor = moonDist * 0.12
+  const { p, e } = computeTransferElements(departureAltKm)
   const points: Array<{ x: number; y: number; z: number }> = []
   for (let i = 0; i <= numPoints; i++) {
-    const t = i / numPoints
-    const x = rPark + (endX - rPark) * t
-    const z = -semiMinor * Math.sin(t * Math.PI)
-    points.push({ x, y: 0, z })
+    const nu = (i / numPoints) * Math.PI
+    const r = keplerRadius(nu, p, e)
+    points.push(transferToScene(nu, r, Math.PI))
   }
   return points
 }
@@ -220,198 +273,179 @@ export interface PhasedTrajectory {
 
 /**
  * Generate flyby trajectory with phase-segmented output for color-coded rendering.
- * Uses LUNAR_SCENE_SCALE for positions; visual Moon radius ensures the arc
- * stays outside the enlarged Moon sphere.
+ * Patched conics: transfer ellipse approach → hyperbolic lunar encounter → departure.
  */
 export function generateFlybyPath(
   departureAltKm: number,
   closestApproachKm = 200,
   numPoints = 120,
 ): PhasedTrajectory {
-  const rPark = (R_EARTH_EQUATORIAL + departureAltKm) / LUNAR_SCENE_SCALE
-  const moonX = MOON_SEMI_MAJOR_AXIS / LUNAR_SCENE_SCALE
+  // ─── Transfer ellipse parameters ───
+  const { sma, e, p } = computeTransferElements(departureAltKm)
+  const nuHandoff = findSOIEntry(p, e)
 
-  const caRatio = closestApproachKm / R_MOON
-  const flybyR = VISUAL_MOON_R * (1 + Math.max(caRatio * 20, 0.8))
-
-  // === Single cubic Bézier from Earth to past Moon ===
-  // P1.z negative (approach from below E-M line), P2.z positive (depart above)
-  // creates visible S-curve deflection. P2.x past moonX ensures far-side pass.
-  const P0x = rPark, P0z = 0
-  const P1x = moonX * 0.45, P1z = -moonX * 0.15
-  const P2x = moonX * 1.05, P2z = moonX * 0.15
-  const P3x = moonX + 0.4, P3z = moonX * 0.25
-
-  // Generate all points on one Bézier
-  const allPoints: Vec3[] = []
-  const moonDists: number[] = []
-  let minDist = Infinity
-  let minIdx = 0
-
-  for (let i = 0; i <= numPoints; i++) {
-    const t = i / numPoints
-    const mt = 1 - t
-    const x = mt*mt*mt*P0x + 3*mt*mt*t*P1x + 3*mt*t*t*P2x + t*t*t*P3x
-    const z = mt*mt*mt*P0z + 3*mt*mt*t*P1z + 3*mt*t*t*P2z + t*t*t*P3z
-    const pt: Vec3 = { x, y: 0, z }
-    allPoints.push(pt)
-    const d = Math.sqrt((x - moonX) ** 2 + z * z)
-    moonDists.push(d)
-    if (d < minDist) { minDist = d; minIdx = i }
-  }
-
-  const closestApproach: Vec3 = { ...allPoints[minIdx] }
-
-  // Split into approach / nearMoon / departure by proximity to Moon
-  const nearThreshold = flybyR * 4
+  // ─── Segment A: Transfer ellipse (Earth → SOI boundary) ───
+  const approachN = Math.floor(numPoints * 0.4)
   const approach: Vec3[] = []
+  for (let i = 0; i <= approachN; i++) {
+    const nu = (i / approachN) * nuHandoff
+    const r = keplerRadius(nu, p, e)
+    approach.push(transferToScene(nu, r, Math.PI))
+  }
+
+  // ─── Hyperbolic encounter parameters ───
+  const vArrival = Math.sqrt(MU_EARTH_KM * (2 / MOON_SEMI_MAJOR_AXIS - 1 / sma))
+  const vMoon = Math.sqrt(MU_EARTH_KM / MOON_SEMI_MAJOR_AXIS)
+  const vInf = Math.max(Math.abs(vMoon - vArrival), 0.01)
+
+  const rPeri = R_MOON + closestApproachKm
+  const aHyp = MU_MOON / (vInf * vInf)
+  const eHyp = 1 + rPeri / aHyp
+  const pHyp = aHyp * (eHyp * eHyp - 1)
+  const nuMax = Math.acos(-1 / eHyp)
+
+  // ─── Velocity alignment: rotate hyperbola to match transfer arrival direction ───
+  const vInAngle = Math.atan2(-(e + Math.cos(nuHandoff)), Math.sin(nuHandoff))
+  const asymInAngle = Math.atan2(-Math.sin(nuMax), Math.cos(nuMax))
+  const thetaRot = vInAngle - asymInAngle
+
+  // ─── Visual scaling: keep periapsis outside the enlarged Moon sphere ───
+  const rPeriScene = rPeri / LUNAR_SCENE_SCALE
+  const hypScale = Math.max(1, VISUAL_MOON_R * 1.3 / rPeriScene)
+
+  // ─── Hyperbola ν-range: start/end at SOI boundary ───
+  const cosNuSOI = Math.max(-1, Math.min(1, (pHyp / MOON_SOI_KM - 1) / eHyp))
+  const nuSOI = Math.acos(cosNuSOI)
+
+  // ─── Segment B: Incoming hyperbola (ν = −nuSOI → 0 periapsis) → nearMoon ───
+  const nearN = Math.floor(numPoints * 0.3)
   const nearMoon: Vec3[] = []
+  for (let i = 0; i <= nearN; i++) {
+    const nu = -nuSOI + (i / nearN) * nuSOI  // −nuSOI → 0
+    const rH = pHyp / (1 + eHyp * Math.cos(nu))
+    nearMoon.push(hyperbolaToScene(rH * Math.cos(nu) * hypScale, rH * Math.sin(nu) * hypScale, thetaRot))
+  }
+
+  // Closest approach at periapsis (ν = 0)
+  const rCA = pHyp / (1 + eHyp) // = rPeri
+  const closestApproach = hyperbolaToScene(rCA * hypScale, 0, thetaRot)
+
+  // ─── Segment C: Outgoing hyperbola (ν = 0 → +nuSOI) → departure ───
+  const departN = numPoints - approachN - nearN
   const departure: Vec3[] = []
-
-  let phase: 'approach' | 'near' | 'depart' = 'approach'
-  for (let i = 0; i <= numPoints; i++) {
-    const pt = allPoints[i]
-    const d = moonDists[i]
-
-    if (phase === 'approach') {
-      if (d <= nearThreshold && i > 0) {
-        phase = 'near'
-        nearMoon.push(pt)
-      } else {
-        approach.push(pt)
-      }
-    } else if (phase === 'near') {
-      if (d > nearThreshold && i > minIdx) {
-        phase = 'depart'
-        departure.push(pt)
-      } else {
-        nearMoon.push(pt)
-      }
-    } else {
-      departure.push(pt)
-    }
+  for (let i = 0; i <= departN; i++) {
+    const nu = (i / departN) * nuSOI  // 0 → +nuSOI
+    const rH = pHyp / (1 + eHyp * Math.cos(nu))
+    departure.push(hyperbolaToScene(rH * Math.cos(nu) * hypScale, rH * Math.sin(nu) * hypScale, thetaRot))
   }
 
-  // Ensure no empty arrays (fallback: put everything in approach)
-  if (nearMoon.length === 0) {
-    nearMoon.push(allPoints[minIdx])
+  return {
+    approach,
+    nearMoon,
+    departure,
+    closestApproach,
+    closestApproachKm,  // physics-based: rPeri − R_MOON = closestApproachKm by construction
+    earthReturn: null,
   }
-  if (departure.length === 0) {
-    departure.push(allPoints[allPoints.length - 1])
-  }
-
-  const caDistKm = Math.max(0, minDist * LUNAR_SCENE_SCALE - R_MOON)
-  return { approach, nearMoon, departure, closestApproach, closestApproachKm: caDistKm, earthReturn: null }
 }
 
 /**
  * Generate free-return figure-8 trajectory with phase-segmented output.
- * Uses LUNAR_SCENE_SCALE for positions; original parametric shape for correct figure-8.
+ * Patched conics: outbound ellipse → hyperbolic swing-by → return ellipse (rotated by deflection).
  */
 export function generateFreeReturnTrajectory(
   departureAltKm: number,
   numPoints = 160,
 ): PhasedTrajectory {
-  const rPark = (R_EARTH_EQUATORIAL + departureAltKm) / LUNAR_SCENE_SCALE
-  const moonX = MOON_SEMI_MAJOR_AXIS / LUNAR_SCENE_SCALE
-  const caRatio = 150 / R_MOON
-  const swingbyR = VISUAL_MOON_R * (1 + Math.max(caRatio * 20, 0.8))
+  const closestApproachKm = 250 // typical free-return CA altitude
 
+  // ─── Transfer ellipse parameters ───
+  const { sma, e, p } = computeTransferElements(departureAltKm)
+  const nuHandoff = findSOIEntry(p, e)
+
+  // ─── Segment 1: Outbound transfer ellipse (Earth → SOI) ───
+  const outboundN = Math.floor(numPoints * 0.35)
   const approach: Vec3[] = []
-  const nearMoon: Vec3[] = []
-  const departure: Vec3[] = []
-
-  // Bulge: how far the trajectory curves away from the E-M line
-  const bulge = moonX * 0.18
-
-  // === Phase 1: Outbound (Earth → Moon vicinity) ===
-  // z = bulge * sin(1.5π * t): starts at 0, peaks +bulge at t≈0.33, crosses 0 at t≈0.67, ends at -bulge
-  const outboundN = Math.floor(numPoints * 0.37)
   for (let i = 0; i <= outboundN; i++) {
-    const t = i / outboundN
-    const x = rPark + (moonX - rPark) * t
-    const z = bulge * Math.sin(1.5 * Math.PI * t)
-    approach.push({ x, y: 0, z })
+    const nu = (i / outboundN) * nuHandoff
+    const r = keplerRadius(nu, p, e)
+    approach.push(transferToScene(nu, r, Math.PI))
   }
 
-  // === Phase 2: Swing-by around far side of Moon ===
-  // Connects outbound endpoint (z ≈ -bulge) to return startpoint (z ≈ +bulge)
-  // Must go BEHIND the Moon (past moonX) — the loop extends beyond lunar distance
-  const swingN = Math.floor(numPoints * 0.15)
-  const outEnd = approach[approach.length - 1]
+  // ─── Hyperbolic encounter parameters ───
+  const vArrival = Math.sqrt(MU_EARTH_KM * (2 / MOON_SEMI_MAJOR_AXIS - 1 / sma))
+  const vMoon = Math.sqrt(MU_EARTH_KM / MOON_SEMI_MAJOR_AXIS)
+  const vInf = Math.max(Math.abs(vMoon - vArrival), 0.01)
 
-  // Start angle: from Moon center to outbound endpoint
-  const startAngle = Math.atan2(outEnd.z, outEnd.x - moonX)
-  // End angle: mirror across x-axis (return departs from +z side)
-  const endAngle = -startAngle
+  const rPeri = R_MOON + closestApproachKm
+  const aHyp = MU_MOON / (vInf * vInf)
+  const eHyp = 1 + rPeri / aHyp
+  const pHyp = aHyp * (eHyp * eHyp - 1)
+  const nuMax = Math.acos(-1 / eHyp)
+  const deflection = 2 * Math.asin(1 / eHyp)
 
-  // We need to sweep through the FAR side of Moon (angle = 0 from Moon = +x direction)
-  // startAngle should be negative (outbound arrives below E-M line, z < 0)
-  // endAngle should be positive (return departs above E-M line, z > 0)
-  // So we sweep counterclockwise: negative angle → 0 (far side) → positive angle
-  let totalSweep = endAngle - startAngle
-  // If sweep is negative, add 2π to go the long way (counterclockwise through far side)
-  if (totalSweep < 0) totalSweep += 2 * Math.PI
-  // If sweep is greater than 1.5π, we're going the wrong way (through near side)
-  if (totalSweep > Math.PI * 1.5) totalSweep -= 2 * Math.PI
+  // ─── Velocity alignment ───
+  const vInAngle = Math.atan2(-(e + Math.cos(nuHandoff)), Math.sin(nuHandoff))
+  const asymInAngle = Math.atan2(-Math.sin(nuMax), Math.cos(nuMax))
+  const thetaRot = vInAngle - asymInAngle
 
-  nearMoon.push({ ...outEnd })
-  let closestApproach: Vec3 | null = null
-  let minDist = Infinity
+  // ─── Visual scaling ───
+  const rPeriScene = rPeri / LUNAR_SCENE_SCALE
+  const hypScale = Math.max(1, VISUAL_MOON_R * 1.3 / rPeriScene)
 
-  // Constant radius = distance of outbound endpoint from Moon center
-  // No interpolation, no dip — every point at the same distance
-  const swingRadius = Math.sqrt((outEnd.x - moonX) ** 2 + outEnd.z ** 2)
+  // ─── Hyperbola ν-range at SOI boundary ───
+  const cosNuSOI = Math.max(-1, Math.min(1, (pHyp / MOON_SOI_KM - 1) / eHyp))
+  const nuSOI = Math.acos(cosNuSOI)
 
-  for (let i = 1; i <= swingN; i++) {
-    const t = i / swingN
-    const angle = startAngle + t * totalSweep
-
-    const pt: Vec3 = {
-      x: moonX + swingRadius * Math.cos(angle),
-      y: 0,
-      z: swingRadius * Math.sin(angle),
-    }
-    nearMoon.push(pt)
-    const dist = Math.sqrt((pt.x - moonX) ** 2 + pt.z ** 2)
-    if (dist < minDist) {
-      minDist = dist
-      closestApproach = { ...pt }
-    }
+  // ─── Segment 2: Hyperbolic swing-by (full arc −nuSOI → +nuSOI) ───
+  const swingN = Math.floor(numPoints * 0.2)
+  const nearMoon: Vec3[] = []
+  for (let i = 0; i <= swingN; i++) {
+    const nu = -nuSOI + (i / swingN) * 2 * nuSOI  // −nuSOI → +nuSOI
+    const rH = pHyp / (1 + eHyp * Math.cos(nu))
+    nearMoon.push(hyperbolaToScene(rH * Math.cos(nu) * hypScale, rH * Math.sin(nu) * hypScale, thetaRot))
   }
 
-  // Validation: flag if any swing-by point is on the Earth-facing side of Moon
-  for (const pt of nearMoon) {
-    if (pt.x < moonX) {
-      console.warn('SWING-BY DIP DETECTED: point.x < moonX', pt)
-    }
-  }
+  // Closest approach at periapsis (ν = 0)
+  const rCA = pHyp / (1 + eHyp)
+  const closestApproach = hyperbolaToScene(rCA * hypScale, 0, thetaRot)
 
-  // === Phase 3: Return (Moon vicinity → Earth) ===
-  // z = -bulge * sin(1.5π * (1-t)): starts at +bulge, crosses 0 at t≈0.33, ends at 0
+  // ─── Segment 3: Return transfer ellipse (SOI → Earth) ───
+  // Same orbital elements, apse line rotated by deflection angle → figure-8
+  const returnOmega = Math.PI + deflection
   const returnN = numPoints - outboundN - swingN
-  const swingEnd = nearMoon[nearMoon.length - 1]
-  departure.push({ ...swingEnd })
 
-  const earthX = 0.02
-  const earthZ = -0.01
+  // Find SOI exit on the return ellipse (where distance to Moon = MOON_SOI_KM)
+  let nuRetLo = 0
+  let nuRetHi = Math.PI
+  for (let iter = 0; iter < 50; iter++) {
+    const nuMid = (nuRetLo + nuRetHi) / 2
+    const r = keplerRadius(nuMid, p, e)
+    const pt = transferToScene(nuMid, r, returnOmega)
+    const dKm = distToMoonScene(pt) * LUNAR_SCENE_SCALE
+    if (dKm < MOON_SOI_KM) nuRetHi = nuMid
+    else nuRetLo = nuMid
+  }
+  const nuReturnHandoff = (nuRetLo + nuRetHi) / 2
 
-  for (let i = 1; i <= returnN; i++) {
-    const t = i / returnN
-    const x = swingEnd.x + (earthX - swingEnd.x) * t
-    // Mirror of outbound: z = -bulge * sin(1.5π * (1-t))
-    const pureZ = -bulge * Math.sin(1.5 * Math.PI * (1 - t))
-    // Blend from swing-by endpoint over first 10%
-    const blend = Math.min(t * 10, 1)
-    const z = (1 - blend) * swingEnd.z + blend * pureZ
-    departure.push({ x, y: 0, z })
+  const departure: Vec3[] = []
+  for (let i = 0; i <= returnN; i++) {
+    // ν sweeps from nuReturnHandoff (near Moon) down to 0 (near Earth)
+    const nu = nuReturnHandoff * (1 - i / returnN)
+    const r = keplerRadius(nu, p, e)
+    departure.push(transferToScene(nu, r, returnOmega))
   }
 
   const earthReturn = departure[departure.length - 1]
-  const caDistKm = closestApproach
-    ? Math.max(0, Math.sqrt((closestApproach.x - moonX) ** 2 + closestApproach.z ** 2) * LUNAR_SCENE_SCALE - R_MOON)
-    : 0
-  return { approach, nearMoon, departure, closestApproach, closestApproachKm: caDistKm, earthReturn }
+
+  return {
+    approach,
+    nearMoon,
+    departure,
+    closestApproach,
+    closestApproachKm,
+    earthReturn,
+  }
 }
 
 /**
