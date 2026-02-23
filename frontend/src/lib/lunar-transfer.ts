@@ -215,10 +215,30 @@ function hyperbolaToScene(xH: number, zH: number, thetaRot: number): Vec3 {
   }
 }
 
+type Vec3 = { x: number; y: number; z: number }
+
 /* ── RK4 numerical propagator ────────────────────────────────── */
 
 /** Visual Moon radius in scene units (matches LunarScene.tsx) */
 const VISUAL_MOON_R = Math.max(R_MOON / LUNAR_SCENE_SCALE, 0.012)
+
+/** Push a scene-coordinate point outward if it falls inside the enlarged visual Moon */
+function clampOutsideVisualMoon(pt: Vec3): Vec3 {
+  const dx = pt.x - MOON_X_SCENE
+  const dz = pt.z
+  const dist = Math.sqrt(dx * dx + dz * dz)
+  const minDist = VISUAL_MOON_R * 1.15
+  if (dist < minDist && dist > 0) {
+    const scale = minDist / dist
+    return { x: MOON_X_SCENE + dx * scale, y: pt.y, z: dz * scale }
+  }
+  return pt
+}
+
+/** Apply visual Moon clamping to an array of points */
+function clampTrajectoryPoints(pts: Vec3[]): Vec3[] {
+  return pts.map(clampOutsideVisualMoon)
+}
 
 /** Gravitational acceleration from Earth + Moon at position (x, z) in km */
 function accel(x: number, z: number): { ax: number; az: number } {
@@ -372,10 +392,8 @@ export function generateLunarTransferArc(
       break
     }
   }
-  return result.points.slice(0, endIdx)
+  return clampTrajectoryPoints(result.points.slice(0, endIdx))
 }
-
-type Vec3 = { x: number; y: number; z: number }
 
 /** Phase-segmented trajectory for color-coded rendering */
 export interface PhasedTrajectory {
@@ -402,8 +420,13 @@ export function generateFlybyPath(
   // Propagate full trajectory
   const sampleEvery = Math.max(1, Math.floor(7 * 86400 / 30 / (numPoints * 1.5)))
   const result = propagateTrajectory(departureAltKm, vzAdj, 7, 30, sampleEvery)
-  const pts = result.points
-  const caIdx = result.closestApproachIdx
+
+  // Truncate ~2.5 days after CA — flyby departs into deep space, does NOT return to Earth
+  const stepsPerDay = 86400 / 30 / sampleEvery
+  const maxPostCA = Math.floor(stepsPerDay * 2.5)
+  const endIdx = Math.min(result.closestApproachIdx + maxPostCA, result.points.length)
+  const pts = result.points.slice(0, endIdx)
+  const caIdx = Math.min(result.closestApproachIdx, pts.length - 1)
 
   // Split into 3 phases based on Moon distance
   // Phase 1 (approach): start → enters Moon SOI (66,000 km)
@@ -424,10 +447,10 @@ export function generateFlybyPath(
   }
 
   return {
-    approach: pts.slice(0, soiEntryIdx + 1),
-    nearMoon: pts.slice(soiEntryIdx, soiExitIdx + 1),
-    departure: pts.slice(soiExitIdx),
-    closestApproach: result.closestApproachPoint,
+    approach: clampTrajectoryPoints(pts.slice(0, soiEntryIdx + 1)),
+    nearMoon: clampTrajectoryPoints(pts.slice(soiEntryIdx, soiExitIdx + 1)),
+    departure: clampTrajectoryPoints(pts.slice(soiExitIdx)),
+    closestApproach: clampOutsideVisualMoon(result.closestApproachPoint),
     closestApproachKm: result.closestApproachKm,
     earthReturn: null,
   }
@@ -478,10 +501,10 @@ export function generateFreeReturnTrajectory(
   }
 
   return {
-    approach: pts.slice(0, soiEntryIdx + 1),
-    nearMoon: pts.slice(soiEntryIdx, soiExitIdx + 1),
-    departure: pts.slice(soiExitIdx),
-    closestApproach: result.closestApproachPoint,
+    approach: clampTrajectoryPoints(pts.slice(0, soiEntryIdx + 1)),
+    nearMoon: clampTrajectoryPoints(pts.slice(soiEntryIdx, soiExitIdx + 1)),
+    departure: clampTrajectoryPoints(pts.slice(soiExitIdx)),
+    closestApproach: clampOutsideVisualMoon(result.closestApproachPoint),
     closestApproachKm: result.closestApproachKm,
     earthReturn: pts[pts.length - 1],
   }
@@ -514,7 +537,7 @@ export function generateDescentPath(
     })
   }
 
-  return points
+  return clampTrajectoryPoints(points)
 }
 
 /**
