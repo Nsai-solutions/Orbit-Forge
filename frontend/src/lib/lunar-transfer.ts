@@ -215,27 +215,18 @@ function hyperbolaToScene(xH: number, zH: number, thetaRot: number): Vec3 {
   }
 }
 
-/* ── RK4 numerical propagator (CR3BP synodic frame) ─────────── */
+/* ── RK4 numerical propagator ────────────────────────────────── */
 
 /** Visual Moon radius in scene units (matches LunarScene.tsx) */
 const VISUAL_MOON_R = Math.max(R_MOON / LUNAR_SCENE_SCALE, 0.012)
 
-/** Moon's mean angular velocity (rad/s) */
-const MOON_ANGULAR_VEL = 2 * Math.PI / MOON_ORBITAL_PERIOD_S
-
-/**
- * Gravitational acceleration + Coriolis + centrifugal in the synodic (rotating) frame.
- * CR3BP equations: x-z orbital plane, rotation about y-axis.
- */
-function accel(x: number, z: number, vx: number, vz: number): { ax: number; az: number } {
+/** Gravitational acceleration from Earth + Moon at position (x, z) in km */
+function accel(x: number, z: number): { ax: number; az: number } {
   const rE = Math.sqrt(x * x + z * z)
   const rM = Math.sqrt((x - MOON_SEMI_MAJOR_AXIS) ** 2 + z * z)
-  const omega = MOON_ANGULAR_VEL
   return {
-    ax: -MU_EARTH_KM * x / (rE ** 3) - MU_MOON * (x - MOON_SEMI_MAJOR_AXIS) / (rM ** 3)
-        + 2 * omega * vz + omega * omega * x,
-    az: -MU_EARTH_KM * z / (rE ** 3) - MU_MOON * z / (rM ** 3)
-        - 2 * omega * vx + omega * omega * z,
+    ax: -MU_EARTH_KM * x / (rE ** 3) - MU_MOON * (x - MOON_SEMI_MAJOR_AXIS) / (rM ** 3),
+    az: -MU_EARTH_KM * z / (rE ** 3) - MU_MOON * z / (rM ** 3),
   }
 }
 
@@ -244,7 +235,7 @@ function rk4Step(
   x: number, z: number, vx: number, vz: number, dt: number
 ): { x: number; z: number; vx: number; vz: number } {
   function deriv(x: number, z: number, vx: number, vz: number) {
-    const a = accel(x, z, vx, vz)
+    const a = accel(x, z)
     return { dx: vx, dz: vz, dvx: a.ax, dvz: a.az }
   }
   const k1 = deriv(x, z, vx, vz)
@@ -274,7 +265,7 @@ function propagateTrajectory(
   dt = 30,
   sampleInterval = 200,
   stopOnEarthReturn = false,
-): { points: Vec3[]; times: number[]; closestApproachKm: number; closestApproachIdx: number; closestApproachPoint: Vec3; closestApproachTime: number } {
+): { points: Vec3[]; closestApproachKm: number; closestApproachIdx: number; closestApproachPoint: Vec3 } {
   const r0 = R_EARTH_EQUATORIAL + departureAltKm
   const sma = (r0 + MOON_SEMI_MAJOR_AXIS) / 2
   const vTLI = Math.sqrt(MU_EARTH_KM * (2 / r0 - 1 / sma))
@@ -285,11 +276,9 @@ function propagateTrajectory(
   let vx = 0, vz = -(vTLI + vzAdjust)
 
   const points: Vec3[] = []
-  const times: number[] = []
   let closestMoonDist = Infinity
   let closestApproachIdx = 0
   let closestApproachPoint: Vec3 = { x: 0, y: 0, z: 0 }
-  let closestApproachTime = 0
 
   const maxSteps = Math.floor(maxDays * 86400 / dt)
   for (let step = 0; step <= maxSteps; step++) {
@@ -300,13 +289,11 @@ function propagateTrajectory(
       closestMoonDist = rMoon
       closestApproachPoint = { x: x / LUNAR_SCENE_SCALE, y: 0, z: z / LUNAR_SCENE_SCALE }
       closestApproachIdx = points.length
-      closestApproachTime = step * dt
     }
 
     // Record output point at sample interval
     if (step % sampleInterval === 0) {
       points.push({ x: x / LUNAR_SCENE_SCALE, y: 0, z: z / LUNAR_SCENE_SCALE })
-      times.push(step * dt)
     }
 
     if (rMoon < R_MOON || Math.sqrt(x * x + z * z) < R_EARTH_EQUATORIAL) break
@@ -323,11 +310,9 @@ function propagateTrajectory(
 
   return {
     points,
-    times,
     closestApproachKm: Math.max(0, closestMoonDist - R_MOON),
     closestApproachIdx: Math.min(closestApproachIdx, points.length - 1),
     closestApproachPoint,
-    closestApproachTime,
   }
 }
 
@@ -438,7 +423,6 @@ export function generateFlybyPath(
     if (d < soiScene) { soiExitIdx = i; break }
   }
 
-  // Propagator outputs synodic-frame coordinates directly (CR3BP with fictitious forces)
   return {
     approach: pts.slice(0, soiEntryIdx + 1),
     nearMoon: pts.slice(soiEntryIdx, soiExitIdx + 1),
@@ -468,6 +452,16 @@ export function generateFreeReturnTrajectory(
   const pts = result.points
   const caIdx = result.closestApproachIdx
 
+  // Visual figure-8: offset return leg out-of-plane for visual separation
+  // The outbound and return legs are coplanar in 2D — this z-offset creates
+  // the visual crossing by shifting the return leg to the opposite side
+  const maxOffset = 0.15  // scene units (~60,000 km — visually distinct)
+  for (let i = caIdx + 1; i < pts.length; i++) {
+    const progress = (i - caIdx) / (pts.length - caIdx)  // 0 at Moon, 1 at Earth return
+    const offset = -Math.sin(progress * Math.PI) * maxOffset  // smooth bulge, max at midpoint
+    pts[i] = { ...pts[i], z: pts[i].z + offset }
+  }
+
   // Split phases
   const soiScene = MOON_SOI_KM / LUNAR_SCENE_SCALE
 
@@ -483,7 +477,6 @@ export function generateFreeReturnTrajectory(
     if (d < soiScene) { soiExitIdx = i; break }
   }
 
-  // Propagator outputs synodic-frame coordinates directly (CR3BP with fictitious forces)
   return {
     approach: pts.slice(0, soiEntryIdx + 1),
     nearMoon: pts.slice(soiEntryIdx, soiExitIdx + 1),
