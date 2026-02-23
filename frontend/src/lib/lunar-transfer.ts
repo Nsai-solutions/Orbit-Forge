@@ -265,7 +265,7 @@ function propagateTrajectory(
   dt = 30,
   sampleInterval = 200,
   stopOnEarthReturn = false,
-): { points: Vec3[]; closestApproachKm: number; closestApproachIdx: number; closestApproachPoint: Vec3 } {
+): { points: Vec3[]; times: number[]; closestApproachKm: number; closestApproachIdx: number; closestApproachPoint: Vec3; closestApproachTime: number } {
   const r0 = R_EARTH_EQUATORIAL + departureAltKm
   const sma = (r0 + MOON_SEMI_MAJOR_AXIS) / 2
   const vTLI = Math.sqrt(MU_EARTH_KM * (2 / r0 - 1 / sma))
@@ -276,9 +276,11 @@ function propagateTrajectory(
   let vx = 0, vz = -(vTLI + vzAdjust)
 
   const points: Vec3[] = []
+  const times: number[] = []
   let closestMoonDist = Infinity
   let closestApproachIdx = 0
   let closestApproachPoint: Vec3 = { x: 0, y: 0, z: 0 }
+  let closestApproachTime = 0
 
   const maxSteps = Math.floor(maxDays * 86400 / dt)
   for (let step = 0; step <= maxSteps; step++) {
@@ -289,11 +291,13 @@ function propagateTrajectory(
       closestMoonDist = rMoon
       closestApproachPoint = { x: x / LUNAR_SCENE_SCALE, y: 0, z: z / LUNAR_SCENE_SCALE }
       closestApproachIdx = points.length
+      closestApproachTime = step * dt
     }
 
     // Record output point at sample interval
     if (step % sampleInterval === 0) {
       points.push({ x: x / LUNAR_SCENE_SCALE, y: 0, z: z / LUNAR_SCENE_SCALE })
+      times.push(step * dt)
     }
 
     if (rMoon < R_MOON || Math.sqrt(x * x + z * z) < R_EARTH_EQUATORIAL) break
@@ -310,9 +314,11 @@ function propagateTrajectory(
 
   return {
     points,
+    times,
     closestApproachKm: Math.max(0, closestMoonDist - R_MOON),
     closestApproachIdx: Math.min(closestApproachIdx, points.length - 1),
     closestApproachPoint,
+    closestApproachTime,
   }
 }
 
@@ -341,6 +347,41 @@ function findVzForCA(departureAltKm: number, targetCAKm: number, maxDays: number
     }
   }
   return (lo + hi) / 2
+}
+
+/* ── Synodic (rotating) frame transformation ────────────────── */
+
+/** Moon's mean angular velocity (rad/s) */
+const MOON_ANGULAR_VEL = 2 * Math.PI / MOON_ORBITAL_PERIOD_S
+
+/**
+ * Rotate trajectory points from the propagator's fixed-Moon frame
+ * to the synodic (rotating) frame for display.
+ * Each point is rotated around Earth (origin) by -ω × t.
+ */
+function toSynodicFrame(points: Vec3[], times: number[]): Vec3[] {
+  return points.map((pt, i) => {
+    const theta = -MOON_ANGULAR_VEL * times[i]
+    const cosT = Math.cos(theta)
+    const sinT = Math.sin(theta)
+    return {
+      x: pt.x * cosT - pt.z * sinT,
+      y: 0,
+      z: pt.x * sinT + pt.z * cosT,
+    }
+  })
+}
+
+/** Rotate a single point to synodic frame */
+function pointToSynodic(pt: Vec3, time: number): Vec3 {
+  const theta = -MOON_ANGULAR_VEL * time
+  const cosT = Math.cos(theta)
+  const sinT = Math.sin(theta)
+  return {
+    x: pt.x * cosT - pt.z * sinT,
+    y: 0,
+    z: pt.x * sinT + pt.z * cosT,
+  }
 }
 
 /**
@@ -423,11 +464,13 @@ export function generateFlybyPath(
     if (d < soiScene) { soiExitIdx = i; break }
   }
 
+  // Rotate each phase to synodic (rotating) frame for display
+  const times = result.times
   return {
-    approach: pts.slice(0, soiEntryIdx + 1),
-    nearMoon: pts.slice(soiEntryIdx, soiExitIdx + 1),
-    departure: pts.slice(soiExitIdx),
-    closestApproach: result.closestApproachPoint,
+    approach: toSynodicFrame(pts.slice(0, soiEntryIdx + 1), times.slice(0, soiEntryIdx + 1)),
+    nearMoon: toSynodicFrame(pts.slice(soiEntryIdx, soiExitIdx + 1), times.slice(soiEntryIdx, soiExitIdx + 1)),
+    departure: toSynodicFrame(pts.slice(soiExitIdx), times.slice(soiExitIdx)),
+    closestApproach: pointToSynodic(result.closestApproachPoint, result.closestApproachTime),
     closestApproachKm: result.closestApproachKm,
     earthReturn: null,
   }
@@ -467,14 +510,15 @@ export function generateFreeReturnTrajectory(
     if (d < soiScene) { soiExitIdx = i; break }
   }
 
-  // For free-return: the departure is everything after SOI exit (return to Earth)
-  const earthReturn = pts[pts.length - 1]
+  // Rotate each phase to synodic (rotating) frame — produces figure-8 shape
+  const times = result.times
+  const earthReturn = pointToSynodic(pts[pts.length - 1], times[times.length - 1])
 
   return {
-    approach: pts.slice(0, soiEntryIdx + 1),
-    nearMoon: pts.slice(soiEntryIdx, soiExitIdx + 1),
-    departure: pts.slice(soiExitIdx),
-    closestApproach: result.closestApproachPoint,
+    approach: toSynodicFrame(pts.slice(0, soiEntryIdx + 1), times.slice(0, soiEntryIdx + 1)),
+    nearMoon: toSynodicFrame(pts.slice(soiEntryIdx, soiExitIdx + 1), times.slice(soiEntryIdx, soiExitIdx + 1)),
+    departure: toSynodicFrame(pts.slice(soiExitIdx), times.slice(soiExitIdx)),
+    closestApproach: pointToSynodic(result.closestApproachPoint, result.closestApproachTime),
     closestApproachKm: result.closestApproachKm,
     earthReturn,
   }
