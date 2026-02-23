@@ -11,8 +11,9 @@ import { RadiationSlice, createRadiationSlice } from './radiation-slice'
 import { ComparisonSlice, createComparisonSlice } from './comparison-slice'
 import { PayloadSlice, createPayloadSlice } from './payload-slice'
 import { BeyondLeoSlice, createBeyondLeoSlice } from './beyond-leo-slice'
+import { ArchitectSlice, createArchitectSlice } from './architect-slice'
 
-export type AppStore = UISlice & MissionSlice & OrbitSlice & GroundSlice & PowerSlice & ConstellationSlice & DeltaVSlice & RadiationSlice & ComparisonSlice & PayloadSlice & BeyondLeoSlice
+export type AppStore = UISlice & MissionSlice & OrbitSlice & GroundSlice & PowerSlice & ConstellationSlice & DeltaVSlice & RadiationSlice & ComparisonSlice & PayloadSlice & BeyondLeoSlice & ArchitectSlice
 
 export const useStore = create<AppStore>()(
   devtools(
@@ -29,10 +30,11 @@ export const useStore = create<AppStore>()(
         ...createComparisonSlice(...a),
         ...createPayloadSlice(...a),
         ...createBeyondLeoSlice(...a),
+        ...createArchitectSlice(...a),
       }),
       {
         name: 'orbitforge-autosave',
-        version: 12,
+        version: 13,
         migrate: (persisted: any, version: number) => {
           if (version < 8) {
             const { groundStations, ...rest } = persisted || {}

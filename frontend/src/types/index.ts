@@ -10,6 +10,7 @@ export enum ModuleId {
   Payload = 'payload',
   BeyondLeo = 'beyond-leo',
   Comparison = 'comparison',
+  MissionArchitect = 'mission-architect',
 }
 
 export const MODULE_LABELS: Record<ModuleId, string> = {
@@ -24,6 +25,7 @@ export const MODULE_LABELS: Record<ModuleId, string> = {
   [ModuleId.Payload]: 'Payload',
   [ModuleId.BeyondLeo]: 'Beyond-LEO',
   [ModuleId.Comparison]: 'Compare',
+  [ModuleId.MissionArchitect]: 'Architect',
 }
 
 export const MODULE_NUMBERS: Record<ModuleId, number> = {
@@ -38,6 +40,7 @@ export const MODULE_NUMBERS: Record<ModuleId, number> = {
   [ModuleId.Payload]: 9,
   [ModuleId.BeyondLeo]: 10,
   [ModuleId.Comparison]: 11,
+  [ModuleId.MissionArchitect]: 12,
 }
 
 export interface Vec3 {
