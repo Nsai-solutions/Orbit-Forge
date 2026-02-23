@@ -215,18 +215,27 @@ function hyperbolaToScene(xH: number, zH: number, thetaRot: number): Vec3 {
   }
 }
 
-/* ── RK4 numerical propagator ────────────────────────────────── */
+/* ── RK4 numerical propagator (CR3BP synodic frame) ─────────── */
 
 /** Visual Moon radius in scene units (matches LunarScene.tsx) */
 const VISUAL_MOON_R = Math.max(R_MOON / LUNAR_SCENE_SCALE, 0.012)
 
-/** Gravitational acceleration from Earth + Moon at position (x, z) in km */
-function accel(x: number, z: number): { ax: number; az: number } {
+/** Moon's mean angular velocity (rad/s) */
+const MOON_ANGULAR_VEL = 2 * Math.PI / MOON_ORBITAL_PERIOD_S
+
+/**
+ * Gravitational acceleration + Coriolis + centrifugal in the synodic (rotating) frame.
+ * CR3BP equations: x-z orbital plane, rotation about y-axis.
+ */
+function accel(x: number, z: number, vx: number, vz: number): { ax: number; az: number } {
   const rE = Math.sqrt(x * x + z * z)
   const rM = Math.sqrt((x - MOON_SEMI_MAJOR_AXIS) ** 2 + z * z)
+  const omega = MOON_ANGULAR_VEL
   return {
-    ax: -MU_EARTH_KM * x / (rE ** 3) - MU_MOON * (x - MOON_SEMI_MAJOR_AXIS) / (rM ** 3),
-    az: -MU_EARTH_KM * z / (rE ** 3) - MU_MOON * z / (rM ** 3),
+    ax: -MU_EARTH_KM * x / (rE ** 3) - MU_MOON * (x - MOON_SEMI_MAJOR_AXIS) / (rM ** 3)
+        + 2 * omega * vz + omega * omega * x,
+    az: -MU_EARTH_KM * z / (rE ** 3) - MU_MOON * z / (rM ** 3)
+        - 2 * omega * vx + omega * omega * z,
   }
 }
 
@@ -235,7 +244,7 @@ function rk4Step(
   x: number, z: number, vx: number, vz: number, dt: number
 ): { x: number; z: number; vx: number; vz: number } {
   function deriv(x: number, z: number, vx: number, vz: number) {
-    const a = accel(x, z)
+    const a = accel(x, z, vx, vz)
     return { dx: vx, dz: vz, dvx: a.ax, dvz: a.az }
   }
   const k1 = deriv(x, z, vx, vz)
@@ -349,41 +358,6 @@ function findVzForCA(departureAltKm: number, targetCAKm: number, maxDays: number
   return (lo + hi) / 2
 }
 
-/* ── Synodic (rotating) frame transformation ────────────────── */
-
-/** Moon's mean angular velocity (rad/s) */
-const MOON_ANGULAR_VEL = 2 * Math.PI / MOON_ORBITAL_PERIOD_S
-
-/**
- * Rotate trajectory points from the propagator's fixed-Moon frame
- * to the synodic (rotating) frame for display.
- * Each point is rotated around Earth (origin) by -ω × t.
- */
-function toSynodicFrame(points: Vec3[], times: number[]): Vec3[] {
-  return points.map((pt, i) => {
-    const theta = -MOON_ANGULAR_VEL * times[i]
-    const cosT = Math.cos(theta)
-    const sinT = Math.sin(theta)
-    return {
-      x: pt.x * cosT - pt.z * sinT,
-      y: 0,
-      z: pt.x * sinT + pt.z * cosT,
-    }
-  })
-}
-
-/** Rotate a single point to synodic frame */
-function pointToSynodic(pt: Vec3, time: number): Vec3 {
-  const theta = -MOON_ANGULAR_VEL * time
-  const cosT = Math.cos(theta)
-  const sinT = Math.sin(theta)
-  return {
-    x: pt.x * cosT - pt.z * sinT,
-    y: 0,
-    z: pt.x * sinT + pt.z * cosT,
-  }
-}
-
 /**
  * Generate lunar transfer arc for 3D rendering.
  * RK4 numerical propagation under Earth+Moon gravity.
@@ -464,13 +438,12 @@ export function generateFlybyPath(
     if (d < soiScene) { soiExitIdx = i; break }
   }
 
-  // Rotate each phase to synodic (rotating) frame for display
-  const times = result.times
+  // Propagator outputs synodic-frame coordinates directly (CR3BP with fictitious forces)
   return {
-    approach: toSynodicFrame(pts.slice(0, soiEntryIdx + 1), times.slice(0, soiEntryIdx + 1)),
-    nearMoon: toSynodicFrame(pts.slice(soiEntryIdx, soiExitIdx + 1), times.slice(soiEntryIdx, soiExitIdx + 1)),
-    departure: toSynodicFrame(pts.slice(soiExitIdx), times.slice(soiExitIdx)),
-    closestApproach: pointToSynodic(result.closestApproachPoint, result.closestApproachTime),
+    approach: pts.slice(0, soiEntryIdx + 1),
+    nearMoon: pts.slice(soiEntryIdx, soiExitIdx + 1),
+    departure: pts.slice(soiExitIdx),
+    closestApproach: result.closestApproachPoint,
     closestApproachKm: result.closestApproachKm,
     earthReturn: null,
   }
@@ -510,17 +483,14 @@ export function generateFreeReturnTrajectory(
     if (d < soiScene) { soiExitIdx = i; break }
   }
 
-  // Rotate each phase to synodic (rotating) frame — produces figure-8 shape
-  const times = result.times
-  const earthReturn = pointToSynodic(pts[pts.length - 1], times[times.length - 1])
-
+  // Propagator outputs synodic-frame coordinates directly (CR3BP with fictitious forces)
   return {
-    approach: toSynodicFrame(pts.slice(0, soiEntryIdx + 1), times.slice(0, soiEntryIdx + 1)),
-    nearMoon: toSynodicFrame(pts.slice(soiEntryIdx, soiExitIdx + 1), times.slice(soiEntryIdx, soiExitIdx + 1)),
-    departure: toSynodicFrame(pts.slice(soiExitIdx), times.slice(soiExitIdx)),
-    closestApproach: pointToSynodic(result.closestApproachPoint, result.closestApproachTime),
+    approach: pts.slice(0, soiEntryIdx + 1),
+    nearMoon: pts.slice(soiEntryIdx, soiExitIdx + 1),
+    departure: pts.slice(soiExitIdx),
+    closestApproach: result.closestApproachPoint,
     closestApproachKm: result.closestApproachKm,
-    earthReturn,
+    earthReturn: pts[pts.length - 1],
   }
 }
 
