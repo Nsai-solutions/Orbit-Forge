@@ -1,6 +1,7 @@
 import type { AnthropicMessage, AnthropicToolDef } from '@/types/architect'
 
-const API_URL = 'https://api.anthropic.com/v1/messages'
+const DIRECT_API_URL = 'https://api.anthropic.com/v1/messages'
+const PROXY_API_URL = '/api/architect-chat'
 const STORAGE_KEY = 'orbitforge-anthropic-key'
 const MODEL = 'claude-sonnet-4-20250514'
 
@@ -18,7 +19,26 @@ export function clearApiKey(): void {
   localStorage.removeItem(STORAGE_KEY)
 }
 
-// ─── Streaming Chat ───
+// ─── Rate Limit Tracking (for proxy mode UI) ───
+
+let remainingAnalyses: number | null = null
+const remainingListeners = new Set<(n: number | null) => void>()
+
+function updateRemainingAnalyses(n: number | null) {
+  remainingAnalyses = n
+  remainingListeners.forEach((fn) => fn(n))
+}
+
+export function getRemainingAnalyses(): number | null {
+  return remainingAnalyses
+}
+
+export function onRemainingChange(fn: (n: number | null) => void): () => void {
+  remainingListeners.add(fn)
+  return () => { remainingListeners.delete(fn) }
+}
+
+// ─── Stream Event Types ───
 
 export interface StreamEvent {
   type: string
@@ -50,53 +70,9 @@ export interface StreamEvent {
   }
 }
 
-export async function sendChat(
-  messages: AnthropicMessage[],
-  tools: AnthropicToolDef[],
-  systemPrompt: string,
-  signal?: AbortSignal,
-): Promise<ReadableStream<StreamEvent>> {
-  const apiKey = getApiKey()
-  if (!apiKey) throw new Error('API key not configured')
+// ─── SSE Stream Parser (shared between both modes) ───
 
-  const response = await fetch(API_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
-      'anthropic-dangerous-direct-browser-access': 'true',
-    },
-    body: JSON.stringify({
-      model: MODEL,
-      max_tokens: 4096,
-      system: systemPrompt,
-      messages,
-      tools: tools.length > 0 ? tools : undefined,
-      stream: true,
-    }),
-    signal,
-  })
-
-  if (!response.ok) {
-    let errorMessage: string
-    try {
-      const errorBody = await response.json()
-      errorMessage = errorBody.error?.message || `API error ${response.status}`
-    } catch {
-      errorMessage = `API error ${response.status}: ${response.statusText}`
-    }
-
-    if (response.status === 401) {
-      clearApiKey()
-      throw new Error('Invalid API key. Please re-enter your Anthropic API key.')
-    }
-    if (response.status === 429) {
-      throw new Error('Rate limited. Please wait a moment and try again.')
-    }
-    throw new Error(errorMessage)
-  }
-
+function parseSSEStream(response: Response): ReadableStream<StreamEvent> {
   const reader = response.body!.getReader()
   const decoder = new TextDecoder()
 
@@ -126,7 +102,6 @@ export async function sendChat(
       while (true) {
         const { done, value } = await reader.read()
         if (done) {
-          // Process any remaining buffer
           if (buffer.trim()) {
             buffer += '\n'
             processBuffer()
@@ -142,4 +117,122 @@ export async function sendChat(
       reader.cancel()
     },
   })
+}
+
+// ─── Dual-Mode Chat: Proxy (default) or Direct (user key) ───
+
+export async function sendChat(
+  messages: AnthropicMessage[],
+  tools: AnthropicToolDef[],
+  systemPrompt: string,
+  signal?: AbortSignal,
+): Promise<ReadableStream<StreamEvent>> {
+  const userApiKey = getApiKey()
+
+  if (userApiKey) {
+    return sendDirect(messages, tools, systemPrompt, userApiKey, signal)
+  }
+  return sendProxy(messages, tools, systemPrompt, signal)
+}
+
+// ─── Proxy Mode (free tier, rate limited) ───
+
+async function sendProxy(
+  messages: AnthropicMessage[],
+  tools: AnthropicToolDef[],
+  systemPrompt: string,
+  signal?: AbortSignal,
+): Promise<ReadableStream<StreamEvent>> {
+  const response = await fetch(PROXY_API_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    signal,
+    body: JSON.stringify({
+      messages,
+      tools: tools.length > 0 ? tools : undefined,
+      system: systemPrompt,
+    }),
+  })
+
+  if (response.status === 429) {
+    let msg = 'Daily limit reached. Enter your own API key for unlimited access.'
+    try {
+      const errorData = await response.json()
+      if (errorData.message) msg = errorData.message
+    } catch { /* use default */ }
+    updateRemainingAnalyses(0)
+    throw new Error(`RATE_LIMITED:${msg}`)
+  }
+
+  if (!response.ok) {
+    let errorMessage: string
+    try {
+      const errorBody = await response.json()
+      errorMessage = errorBody.error || `Proxy error ${response.status}`
+    } catch {
+      errorMessage = `Proxy error ${response.status}: ${response.statusText}`
+    }
+    throw new Error(errorMessage)
+  }
+
+  // Update remaining count from headers
+  const remaining = response.headers.get('X-RateLimit-Remaining')
+  if (remaining !== null) {
+    updateRemainingAnalyses(parseInt(remaining, 10))
+  }
+
+  return parseSSEStream(response)
+}
+
+// ─── Direct Mode (user's own key, unlimited) ───
+
+async function sendDirect(
+  messages: AnthropicMessage[],
+  tools: AnthropicToolDef[],
+  systemPrompt: string,
+  apiKey: string,
+  signal?: AbortSignal,
+): Promise<ReadableStream<StreamEvent>> {
+  const response = await fetch(DIRECT_API_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-direct-browser-access': 'true',
+    },
+    body: JSON.stringify({
+      model: MODEL,
+      max_tokens: 4096,
+      system: systemPrompt,
+      messages,
+      tools: tools.length > 0 ? tools : undefined,
+      stream: true,
+    }),
+    signal,
+  })
+
+  if (!response.ok) {
+    let errorMessage: string
+    try {
+      const errorBody = await response.json()
+      errorMessage = errorBody.error?.message || `API error ${response.status}`
+    } catch {
+      errorMessage = `API error ${response.status}: ${response.statusText}`
+    }
+
+    if (response.status === 401) {
+      clearApiKey()
+      throw new Error('INVALID_KEY')
+    }
+    if (response.status === 429) {
+      throw new Error('Rate limited by Anthropic. Please wait a moment and try again.')
+    }
+    throw new Error(errorMessage)
+  }
+
+  // Direct mode = unlimited, clear any proxy rate limit display
+  updateRemainingAnalyses(null)
+
+  return parseSSEStream(response)
 }

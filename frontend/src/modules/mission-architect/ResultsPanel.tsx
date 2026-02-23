@@ -3,6 +3,7 @@ import { useStore } from '@/stores'
 import { ModuleId, MODULE_LABELS } from '@/types'
 import { R_EARTH_EQUATORIAL } from '@/lib/constants'
 import type { ChatMessage, ToolCallRecord, MetricStatus } from '@/types/architect'
+import MissionVisualization from './MissionVisualization'
 
 // ─── Types ───
 
@@ -222,8 +223,11 @@ function extractResultSections(messages: ChatMessage[]): ResultSection[] {
 
 export default function ResultsPanel() {
   const messages = useStore((s) => s.architectMessages)
+  const viz = useStore((s) => s.architectVisualization)
 
   const sections = useMemo(() => extractResultSections(messages), [messages])
+
+  const hasContent = sections.length > 0 || viz !== null
 
   return (
     <>
@@ -236,16 +240,19 @@ export default function ResultsPanel() {
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto p-3 space-y-3">
-        {sections.length === 0 ? (
+        {!hasContent ? (
           <div className="flex items-center justify-center h-full text-center py-12">
             <p className="text-xs text-[var(--text-tertiary)] max-w-[200px] leading-relaxed">
               Start a conversation to see mission analysis results here
             </p>
           </div>
         ) : (
-          sections.map((section, i) => (
-            <SectionCard key={`${section.toolName}-${i}`} section={section} />
-          ))
+          <>
+            <MissionVisualization />
+            {sections.map((section, i) => (
+              <SectionCard key={`${section.toolName}-${i}`} section={section} />
+            ))}
+          </>
         )}
       </div>
     </>

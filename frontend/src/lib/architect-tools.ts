@@ -131,6 +131,39 @@ export const TOOL_DEFINITIONS: AnthropicToolDef[] = [
       required: ['payload_type', 'altitude_km'],
     },
   },
+  {
+    name: 'set_visualization',
+    description: 'Set the 3D visualization in the results panel. Call this after analyze_orbit to show the mission visually. Choose a template that best matches the mission type and pass the orbital parameters.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        template: {
+          type: 'string',
+          enum: ['leo-orbit', 'leo-with-stations', 'constellation', 'ground-coverage'],
+          description: 'Visualization template: leo-orbit (single orbit ring), leo-with-stations (orbit + ground station markers), constellation (Walker constellation with multiple planes), ground-coverage (orbit + swath footprint)',
+        },
+        altitude_km: { type: 'number', description: 'Orbital altitude in km' },
+        inclination_deg: { type: 'number', description: 'Orbital inclination in degrees' },
+        stations: {
+          type: 'array',
+          description: 'Ground stations to show (for leo-with-stations template)',
+          items: {
+            type: 'object',
+            properties: {
+              name: { type: 'string' },
+              lat: { type: 'number', description: 'Latitude in degrees' },
+              lon: { type: 'number', description: 'Longitude in degrees' },
+            },
+            required: ['name', 'lat', 'lon'],
+          },
+        },
+        num_planes: { type: 'number', description: 'Number of orbital planes (for constellation template)' },
+        sats_per_plane: { type: 'number', description: 'Satellites per plane (for constellation template)' },
+        swath_width_km: { type: 'number', description: 'Sensor swath width in km (for ground-coverage template)' },
+      },
+      required: ['template', 'altitude_km', 'inclination_deg'],
+    },
+  },
 ]
 
 // ─── Tool Executors ───
@@ -217,6 +250,8 @@ export function executeToolCall(
       return executePredictLifetime(input)
     case 'analyze_payload':
       return executeAnalyzePayload(input)
+    case 'set_visualization':
+      return executeSetVisualization(input)
     default:
       throw new Error(`Unknown tool: ${toolName}`)
   }
@@ -427,4 +462,34 @@ function executeAnalyzePayload(input: Record<string, unknown>): Record<string, u
   }
 
   throw new Error(`Unsupported payload type: ${payloadType}. Use 'earth-observation' or 'satcom'.`)
+}
+
+function executeSetVisualization(input: Record<string, unknown>): Record<string, unknown> {
+  // This tool returns the visualization config for the store.
+  // The actual store update is handled by useArchitectChat after tool execution.
+  const template = input.template as string
+  const altKm = input.altitude_km as number
+  const incDeg = input.inclination_deg as number
+
+  const result: Record<string, unknown> = {
+    template,
+    altitude_km: altKm,
+    inclination_deg: incDeg,
+    status: 'visualization_set',
+  }
+
+  if (input.stations) {
+    result.stations = input.stations
+  }
+  if (input.num_planes) {
+    result.num_planes = input.num_planes
+  }
+  if (input.sats_per_plane) {
+    result.sats_per_plane = input.sats_per_plane
+  }
+  if (input.swath_width_km) {
+    result.swath_width_km = input.swath_width_km
+  }
+
+  return result
 }

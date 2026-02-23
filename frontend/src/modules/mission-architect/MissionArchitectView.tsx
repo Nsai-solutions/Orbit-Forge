@@ -1,20 +1,7 @@
-import { useState, useCallback } from 'react'
-import { getApiKey } from '@/lib/anthropic-client'
-import ApiKeySetup from './ApiKeySetup'
 import ChatPanel from './ChatPanel'
 import ResultsPanel from './ResultsPanel'
 
 export default function MissionArchitectView() {
-  const [hasKey, setHasKey] = useState(() => !!getApiKey())
-
-  const handleKeySet = useCallback(() => {
-    setHasKey(true)
-  }, [])
-
-  if (!hasKey) {
-    return <ApiKeySetup onKeySet={handleKeySet} />
-  }
-
   return (
     <div className="flex-1 flex overflow-hidden">
       {/* Chat Panel — 60% */}

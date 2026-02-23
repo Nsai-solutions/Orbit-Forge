@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useStore } from '@/stores'
 import { useArchitectChat } from './useArchitectChat'
+import AccessBadge from './AccessBadge'
 import type { ChatMessage, ToolCallRecord } from '@/types/architect'
 
 // ─── Simple Markdown Renderer ───
@@ -39,6 +40,7 @@ function ToolCallIndicator({ toolCall }: { toolCall: ToolCallRecord }) {
     compute_ground_passes: 'Computing ground passes',
     predict_lifetime: 'Predicting lifetime',
     analyze_payload: 'Analyzing payload',
+    set_visualization: 'Rendering visualization',
   }
 
   const label = toolLabels[toolCall.toolName] || toolCall.toolName
@@ -226,6 +228,9 @@ export default function ChatPanel() {
           </button>
         )}
       </div>
+
+      {/* Access Mode Badge */}
+      <AccessBadge />
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto px-3 py-3 space-y-3">

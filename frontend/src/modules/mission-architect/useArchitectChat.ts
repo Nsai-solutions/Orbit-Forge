@@ -241,6 +241,24 @@ export function useArchitectChat() {
           }
         }
 
+        // Handle set_visualization tool — update store state
+        for (const tc of executedToolCalls) {
+          if (tc.toolName === 'set_visualization' && tc.status === 'complete' && tc.output) {
+            const vizOutput = tc.output as Record<string, unknown>
+            store.setArchitectVisualization({
+              template: vizOutput.template as 'leo-orbit' | 'leo-with-stations' | 'constellation' | 'ground-coverage',
+              params: {
+                altitude_km: vizOutput.altitude_km as number,
+                inclination_deg: vizOutput.inclination_deg as number,
+                stations: vizOutput.stations as { name: string; lat: number; lon: number }[] | undefined,
+                num_planes: vizOutput.num_planes as number | undefined,
+                sats_per_plane: vizOutput.sats_per_plane as number | undefined,
+                swath_width_km: vizOutput.swath_width_km as number | undefined,
+              },
+            })
+          }
+        }
+
         // Update the assistant message with tool results
         updateArchitectMessage(assistantId, {
           toolCalls: executedToolCalls,
@@ -270,7 +288,18 @@ export function useArchitectChat() {
         return
       }
 
-      const errorMessage = err instanceof Error ? err.message : 'An unexpected error occurred'
+      const rawError = err instanceof Error ? err.message : 'An unexpected error occurred'
+
+      // Handle specific error types
+      let errorMessage: string
+      if (rawError.startsWith('RATE_LIMITED:')) {
+        errorMessage = rawError.replace('RATE_LIMITED:', '')
+      } else if (rawError === 'INVALID_KEY') {
+        errorMessage = 'Your API key is invalid or expired. Please remove it and try again, or enter a new key.'
+      } else {
+        errorMessage = rawError
+      }
+
       setArchitectError(errorMessage)
       updateArchitectMessage(assistantId, {
         isStreaming: false,
