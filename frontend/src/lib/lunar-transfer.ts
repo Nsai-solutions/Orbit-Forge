@@ -227,7 +227,7 @@ function clampOutsideVisualMoon(pt: Vec3): Vec3 {
   const dx = pt.x - MOON_X_SCENE
   const dz = pt.z
   const dist = Math.sqrt(dx * dx + dz * dz)
-  const minDist = VISUAL_MOON_R * 1.15
+  const minDist = VISUAL_MOON_R * 1.05
   if (dist < minDist && dist > 0) {
     const scale = minDist / dist
     return { x: MOON_X_SCENE + dx * scale, y: pt.y, z: dz * scale }
@@ -421,12 +421,18 @@ export function generateFlybyPath(
   const sampleEvery = Math.max(1, Math.floor(7 * 86400 / 30 / (numPoints * 1.5)))
   const result = propagateTrajectory(departureAltKm, vzAdj, 7, 30, sampleEvery)
 
-  // Truncate ~2.5 days after CA — flyby departs into deep space, does NOT return to Earth
-  const stepsPerDay = 86400 / 30 / sampleEvery
-  const maxPostCA = Math.floor(stepsPerDay * 2.5)
-  const endIdx = Math.min(result.closestApproachIdx + maxPostCA, result.points.length)
+  // Truncate after CA: keep departure points until spacecraft reaches 100,000 km
+  // from Moon or starts heading back toward Earth, then stop
+  const caIdx = Math.min(result.closestApproachIdx, result.points.length - 1)
+  const maxDepartDist = 100000 / LUNAR_SCENE_SCALE  // 100,000 km in scene units
+  let endIdx = result.points.length
+  for (let i = caIdx + 1; i < result.points.length; i++) {
+    const dx = result.points[i].x - MOON_X_SCENE
+    const dz = result.points[i].z
+    const dist = Math.sqrt(dx * dx + dz * dz)
+    if (dist > maxDepartDist) { endIdx = i + 1; break }
+  }
   const pts = result.points.slice(0, endIdx)
-  const caIdx = Math.min(result.closestApproachIdx, pts.length - 1)
 
   // Split into 3 phases based on Moon distance
   // Phase 1 (approach): start → enters Moon SOI (66,000 km)
