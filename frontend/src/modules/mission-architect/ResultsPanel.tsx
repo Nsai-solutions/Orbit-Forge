@@ -1,8 +1,9 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { useStore } from '@/stores'
 import { ModuleId, MODULE_LABELS } from '@/types'
 import { R_EARTH_EQUATORIAL } from '@/lib/constants'
 import type { ChatMessage, ToolCallRecord, MetricStatus } from '@/types/architect'
+import { generateArchitectReport } from '@/lib/architect-report'
 import MissionVisualization from './MissionVisualization'
 
 // ─── Types ───
@@ -221,6 +222,36 @@ function extractResultSections(messages: ChatMessage[]): ResultSection[] {
 
 // ─── Main Results Panel ───
 
+// ─── Export Report Button ───
+
+function ExportReportButton({ messages }: { messages: ChatMessage[] }) {
+  const [status, setStatus] = useState<'idle' | 'generating' | 'done' | 'error'>('idle')
+
+  const handleExport = async () => {
+    setStatus('generating')
+    try {
+      await generateArchitectReport(messages)
+      setStatus('done')
+      setTimeout(() => setStatus('idle'), 2000)
+    } catch {
+      setStatus('error')
+      setTimeout(() => setStatus('idle'), 3000)
+    }
+  }
+
+  return (
+    <button
+      onClick={handleExport}
+      disabled={status === 'generating'}
+      className="w-full py-2 rounded border border-accent-cyan/30 bg-accent-cyan/10 text-accent-cyan text-xs font-medium hover:bg-accent-cyan/20 transition-colors disabled:opacity-50 disabled:cursor-wait"
+    >
+      {status === 'generating' ? 'Generating PDF...' : status === 'done' ? 'Report Downloaded' : status === 'error' ? 'Export Failed' : 'Export Report'}
+    </button>
+  )
+}
+
+// ─── Main Results Panel ───
+
 export default function ResultsPanel() {
   const messages = useStore((s) => s.architectMessages)
   const viz = useStore((s) => s.architectVisualization)
@@ -228,6 +259,7 @@ export default function ResultsPanel() {
   const sections = useMemo(() => extractResultSections(messages), [messages])
 
   const hasContent = sections.length > 0 || viz !== null
+  const hasToolResults = sections.length > 0
 
   return (
     <>
@@ -252,6 +284,7 @@ export default function ResultsPanel() {
             {sections.map((section, i) => (
               <SectionCard key={`${section.toolName}-${i}`} section={section} />
             ))}
+            {hasToolResults && <ExportReportButton messages={messages} />}
           </>
         )}
       </div>

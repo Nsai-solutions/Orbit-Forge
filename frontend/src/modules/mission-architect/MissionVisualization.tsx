@@ -289,29 +289,32 @@ function GroundCoverageScene({ params }: { params: ArchitectVisualization['param
 
 // ─── Scene Wrapper ───
 
+function TemplateScene({ viz }: { viz: ArchitectVisualization }) {
+  switch (viz.template) {
+    case 'leo-orbit':
+      return <LEOOrbitScene params={viz.params} />
+    case 'leo-with-stations':
+      return <LEOWithStationsScene params={viz.params} />
+    case 'constellation':
+      return <ConstellationScene params={viz.params} />
+    case 'ground-coverage':
+      return <GroundCoverageScene params={viz.params} />
+  }
+}
+
 function SceneContent({ viz }: { viz: ArchitectVisualization }) {
-  const templateScene = useMemo(() => {
-    switch (viz.template) {
-      case 'leo-orbit':
-        return <LEOOrbitScene params={viz.params} />
-      case 'leo-with-stations':
-        return <LEOWithStationsScene params={viz.params} />
-      case 'constellation':
-        return <ConstellationScene params={viz.params} />
-      case 'ground-coverage':
-        return <GroundCoverageScene params={viz.params} />
-    }
-  }, [viz])
+  // Key forces full scene remount when template or params change
+  const sceneKey = `${viz.template}-${viz.params.altitude_km}-${viz.params.inclination_deg}`
 
   return (
     <>
       <ambientLight intensity={0.15} />
       <directionalLight position={[5, 3, 4]} intensity={1.2} />
 
-      <AutoRotate>
+      <AutoRotate key={sceneKey}>
         <Earth />
         <Atmosphere />
-        {templateScene}
+        <TemplateScene viz={viz} />
       </AutoRotate>
 
       <OrbitControls

@@ -1,3 +1,4 @@
+import { useStore } from '@/stores'
 import type { AnthropicToolDef } from '@/types/architect'
 import type { OrbitalElements } from '@/types/orbit'
 import type { SpacecraftConfig, CubeSatSize } from '@/types/mission'
@@ -183,13 +184,17 @@ function buildSpacecraft(input: Record<string, unknown>): SpacecraftConfig {
   const size = (input.spacecraft_size as CubeSatSize) || DEFAULT_SPACECRAFT.size
   const sizeSpec = CUBESAT_SIZES[size]
 
+  // Always derive panel area from CubeSat size (matches Power tab behavior).
+  // AI-specified solar_panel_area_m2 is ignored to prevent inflated values.
+  const panelArea = sizeSpec?.typicalPanelArea || DEFAULT_SPACECRAFT.solarPanelArea
+
   return {
     ...DEFAULT_SPACECRAFT,
     size,
     mass: (input.spacecraft_mass_kg as number) || sizeSpec?.typicalMass.max || DEFAULT_SPACECRAFT.mass,
-    solarPanelConfig: (input.solar_panel_config as SpacecraftConfig['solarPanelConfig']) || DEFAULT_SPACECRAFT.solarPanelConfig,
-    pointingMode: (input.pointing_mode as SpacecraftConfig['pointingMode']) || DEFAULT_SPACECRAFT.pointingMode,
-    solarPanelArea: (input.solar_panel_area_m2 as number) || sizeSpec?.typicalPanelArea || DEFAULT_SPACECRAFT.solarPanelArea,
+    solarPanelConfig: DEFAULT_SPACECRAFT.solarPanelConfig,
+    pointingMode: DEFAULT_SPACECRAFT.pointingMode,
+    solarPanelArea: panelArea,
     batteryCapacity: (input.battery_capacity_wh as number) || DEFAULT_SPACECRAFT.batteryCapacity,
   }
 }
@@ -268,6 +273,16 @@ function executeAnalyzeOrbit(input: Record<string, unknown>): Record<string, unk
   const elements = buildElements(altKm, incDeg, ecc, raanDeg)
   const derived = computeDerivedParams(elements)
 
+  // Sync to orbit tab store
+  useStore.getState().updateElements({
+    semiMajorAxis: R_EARTH_EQUATORIAL + altKm,
+    eccentricity: ecc,
+    inclination: incDeg,
+    raan: raanDeg,
+    argOfPerigee: 0,
+    trueAnomaly: 0,
+  })
+
   return {
     altitude_km: altKm,
     inclination_deg: incDeg,
@@ -297,6 +312,20 @@ function executeComputePowerBudget(input: Record<string, unknown>): Record<strin
   const subsystems = buildSubsystems(input)
 
   const analysis = computePowerAnalysis(elements, spacecraft, subsystems, lifetimeYears)
+
+  // Sync to spacecraft + power store
+  const store = useStore.getState()
+  store.updateSpacecraft({
+    size: spacecraft.size,
+    mass: spacecraft.mass,
+    solarPanelConfig: spacecraft.solarPanelConfig,
+    solarPanelArea: spacecraft.solarPanelArea,
+    solarCellEfficiency: spacecraft.solarCellEfficiency,
+    pointingMode: spacecraft.pointingMode,
+    batteryCapacity: spacecraft.batteryCapacity,
+  })
+  store.updateMission({ lifetimeTarget: lifetimeYears })
+  store.setSubsystems(subsystems)
 
   return {
     spacecraft_config: {
@@ -338,6 +367,9 @@ function executeComputeGroundPasses(input: Record<string, unknown>): Record<stri
   const passes = predictPasses(elements, epoch, stations, durationDays)
   const metrics = computePassMetrics(passes, durationDays, dataRateKbps)
 
+  // Sync ground stations to store
+  useStore.getState().setGroundStations(stations)
+
   // Summarize top passes (don't send raw list — too many tokens)
   const topPasses = passes
     .sort((a, b) => b.maxElevation - a.maxElevation)
@@ -373,6 +405,12 @@ function executePredictLifetime(input: Record<string, unknown>): Record<string, 
   const bStar = computeBallisticCoefficient(massKg, crossSection)
   const compliance = checkCompliance(altKm, bStar, solarActivity)
 
+  // Sync spacecraft mass to store
+  useStore.getState().updateSpacecraft({
+    size: size as CubeSatSize,
+    mass: massKg,
+  })
+
   return {
     altitude_km: altKm,
     spacecraft_size: size,
@@ -405,6 +443,17 @@ function executeAnalyzePayload(input: Record<string, unknown>): Record<string, u
     }
     const shared: SharedPayloadConfig = { ...DEFAULT_SHARED }
     const analysis = computeEOAnalysis(eoConfig, shared, altKm, incDeg)
+
+    // Sync to payload store
+    const store = useStore.getState()
+    store.setPayloadType('earth-observation')
+    store.updatePayloadEO({
+      focalLength: eoConfig.focalLength,
+      apertureDia: eoConfig.apertureDia,
+      pixelSize: eoConfig.pixelSize,
+      detectorWidth: eoConfig.detectorWidth,
+      spectralBands: eoConfig.spectralBands,
+    })
 
     return {
       payload_type: 'earth-observation',
@@ -439,6 +488,16 @@ function executeAnalyzePayload(input: Record<string, unknown>): Record<string, u
     }
     const shared: SharedPayloadConfig = { ...DEFAULT_SHARED }
     const analysis = computeSATCOMAnalysis(satcomConfig, shared, altKm)
+
+    // Sync to payload store
+    const store = useStore.getState()
+    store.setPayloadType('satcom')
+    store.updatePayloadSATCOM({
+      downlinkFreq: satcomConfig.downlinkFreq,
+      satAntennaDia: satcomConfig.satAntennaDia,
+      satTxPower: satcomConfig.satTxPower,
+      gsAntennaDia: satcomConfig.gsAntennaDia,
+    })
 
     return {
       payload_type: 'satcom',
