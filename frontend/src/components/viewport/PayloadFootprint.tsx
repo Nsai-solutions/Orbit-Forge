@@ -12,6 +12,9 @@ import { useSatellitePosition } from './SatellitePositionContext'
 const FOOTPRINT_COLOR = new THREE.Color('#06B6D4')
 const FOOTPRINT_SURFACE_R = 1.005 // slightly above globe
 
+// No-op raycast — prevents footprint meshes from occluding Html labels
+const noRaycast = () => {}
+
 // Circle footprint (SATCOM beam)
 const CIRCLE_SEGMENTS = 32
 // Rectangle footprint (EO/SAR)
@@ -171,7 +174,7 @@ function CircleFootprint({ radiusKm }: { radiusKm: number }) {
 
   return (
     <group>
-      <mesh ref={meshRef} geometry={fillGeo} material={fillMaterial} />
+      <mesh ref={meshRef} geometry={fillGeo} material={fillMaterial} raycast={noRaycast} />
       <group ref={lineRef}>
         <Line points={borderPoints} color="#06B6D4" lineWidth={1.5} transparent opacity={0.5} />
       </group>
@@ -278,7 +281,7 @@ function RectangleFootprint({
 
   return (
     <group>
-      <mesh ref={meshRef} geometry={fillGeo} material={fillMaterial} />
+      <mesh ref={meshRef} geometry={fillGeo} material={fillMaterial} raycast={noRaycast} />
       <Line points={borderPoints} color="#06B6D4" lineWidth={1.5} transparent opacity={0.5} />
     </group>
   )

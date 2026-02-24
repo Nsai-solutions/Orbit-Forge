@@ -13,6 +13,9 @@ const CONE_OPACITY_DEFAULT = 0.10
 const CONE_OPACITY_ACTIVE = 0.22
 const LINK_COLOR = '#10B981'
 
+// No-op raycast — prevents cone meshes from occluding Html labels
+const noRaycast = () => {}
+
 // Pre-allocated temporaries for useFrame (avoid GC)
 const _stationUp = new THREE.Vector3()
 const _satDir = new THREE.Vector3()
@@ -126,7 +129,7 @@ function ConeGeometry({ data }: { data: StationConeData }) {
     material.opacity = isActive ? CONE_OPACITY_ACTIVE : CONE_OPACITY_DEFAULT
   })
 
-  return <mesh ref={meshRef} geometry={geometry} material={material} />
+  return <mesh ref={meshRef} geometry={geometry} material={material} raycast={noRaycast} />
 }
 
 function CommLinkLines({ cones }: { cones: StationConeData[] }) {

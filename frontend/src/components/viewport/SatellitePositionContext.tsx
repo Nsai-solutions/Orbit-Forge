@@ -1,4 +1,4 @@
-import { createContext, useContext, useRef } from 'react'
+import { createContext, useContext, useMemo, useRef } from 'react'
 import type { ReactNode } from 'react'
 import * as THREE from 'three'
 
@@ -14,8 +14,10 @@ const SatellitePositionContext = createContext<SatellitePositionContextValue | n
 export function SatellitePositionProvider({ children }: { children: ReactNode }) {
   const positionRef = useRef(new THREE.Vector3())
   const phaseRef = useRef(0)
+  // Memoize to prevent consumer re-renders when parent re-renders
+  const value = useMemo(() => ({ positionRef, phaseRef }), [])
   return (
-    <SatellitePositionContext.Provider value={{ positionRef, phaseRef }}>
+    <SatellitePositionContext.Provider value={value}>
       {children}
     </SatellitePositionContext.Provider>
   )

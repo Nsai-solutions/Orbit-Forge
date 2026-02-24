@@ -55,7 +55,10 @@ function AdaptiveControls() {
 }
 
 export default function EarthScene() {
-  const overlayToggles = useStore((s) => s.overlayToggles)
+  // Individual primitive selectors — avoids re-renders from unrelated store changes
+  const showCones = useStore((s) => s.overlayToggles.stationCoverage)
+  const showCommLinks = useStore((s) => s.overlayToggles.commLinks)
+  const showFootprint = useStore((s) => s.overlayToggles.sensorFootprint)
 
   return (
     <>
@@ -80,10 +83,10 @@ export default function EarthScene() {
 
         {/* Visibility & footprint overlays */}
         <StationVisibilityCones
-          showCones={overlayToggles.stationCoverage}
-          showCommLinks={overlayToggles.commLinks}
+          showCones={showCones}
+          showCommLinks={showCommLinks}
         />
-        <PayloadFootprint showFootprint={overlayToggles.sensorFootprint} />
+        <PayloadFootprint showFootprint={showFootprint} />
       </SatellitePositionProvider>
 
       <AdaptiveControls />
