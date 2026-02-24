@@ -212,6 +212,68 @@ function extractResultSections(messages: ChatMessage[]): ResultSection[] {
           })
           break
         }
+
+        case 'analyze_lagrange': {
+          const sys = result.system === 'sun-earth' ? 'Sun-Earth' : 'Earth-Moon'
+          sections.push({
+            title: `Lagrange (${sys} L${result.l_point})`,
+            moduleId: ModuleId.BeyondLeo,
+            toolName: tc.toolName,
+            items: [
+              { label: 'L-Point Distance', value: Number(result.l_point_distance_km).toLocaleString(), unit: 'km' },
+              { label: 'Transfer \u0394V', value: `${result.transfer_delta_v_ms}`, unit: 'm/s' },
+              { label: 'Transfer Time', value: `${result.transfer_time_days}`, unit: 'days' },
+              { label: 'Station-Keeping', value: `${result.station_keeping_delta_v_ms_per_year}`, unit: 'm/s/yr' },
+              { label: 'Orbit Period', value: `${result.orbit_period_days}`, unit: 'days' },
+              { label: 'Stability', value: result.stability === 'stable' ? 'Stable' : 'Unstable', status: result.stability === 'stable' ? 'nominal' : 'warning' },
+            ],
+          })
+          break
+        }
+
+        case 'analyze_lunar_transfer': {
+          const mType = result.mission_type as string
+          const missionLabel: Record<string, string> = {
+            'orbit-insertion': 'Orbit Insertion',
+            'flyby': 'Flyby',
+            'free-return': 'Free-Return',
+            'landing': 'Landing',
+          }
+          const items: ResultSection['items'] = [
+            { label: 'Mission Type', value: missionLabel[mType] || mType },
+            { label: 'TLI \u0394V', value: `${result.tli_delta_v_ms}`, unit: 'm/s' },
+            { label: 'LOI \u0394V', value: `${result.loi_delta_v_ms}`, unit: 'm/s' },
+            { label: 'Total \u0394V', value: `${result.total_delta_v_ms}`, unit: 'm/s' },
+            { label: 'Transfer Time', value: `${result.transfer_time_days}`, unit: 'days' },
+            { label: 'Propellant Mass', value: `${result.propellant_mass_kg}`, unit: 'kg' },
+          ]
+          sections.push({
+            title: 'Lunar Transfer',
+            moduleId: ModuleId.BeyondLeo,
+            toolName: tc.toolName,
+            items,
+          })
+          break
+        }
+
+        case 'analyze_interplanetary': {
+          const body = (result.target_body as string).charAt(0).toUpperCase() + (result.target_body as string).slice(1)
+          sections.push({
+            title: `Interplanetary (${body})`,
+            moduleId: ModuleId.BeyondLeo,
+            toolName: tc.toolName,
+            items: [
+              { label: 'Departure \u0394V', value: `${result.departure_delta_v_ms}`, unit: 'm/s' },
+              { label: 'Arrival \u0394V', value: `${result.arrival_delta_v_ms}`, unit: 'm/s' },
+              { label: 'Total \u0394V', value: `${result.total_delta_v_ms}`, unit: 'm/s' },
+              { label: 'C3 Energy', value: `${result.c3_km2_s2}`, unit: 'km\u00B2/s\u00B2' },
+              { label: 'Transfer Time', value: `${result.transfer_time_days}`, unit: 'days' },
+              { label: 'Launch Window', value: `Every ${result.synodic_period_days}`, unit: 'days' },
+              { label: 'Propellant Mass', value: `${result.propellant_mass_kg}`, unit: 'kg' },
+            ],
+          })
+          break
+        }
       }
     }
   }

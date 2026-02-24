@@ -6,6 +6,9 @@ interface ToolResults {
   compute_ground_passes?: Record<string, unknown>
   predict_lifetime?: Record<string, unknown>
   analyze_payload?: Record<string, unknown>
+  analyze_lagrange?: Record<string, unknown>
+  analyze_lunar_transfer?: Record<string, unknown>
+  analyze_interplanetary?: Record<string, unknown>
 }
 
 function extractToolResults(messages: ChatMessage[]): ToolResults {
@@ -20,7 +23,8 @@ function extractToolResults(messages: ChatMessage[]): ToolResults {
       if (name in results) continue // already have latest
       if (name === 'analyze_orbit' || name === 'compute_power_budget' ||
           name === 'compute_ground_passes' || name === 'predict_lifetime' ||
-          name === 'analyze_payload') {
+          name === 'analyze_payload' || name === 'analyze_lagrange' ||
+          name === 'analyze_lunar_transfer' || name === 'analyze_interplanetary') {
         results[name] = tc.output as Record<string, unknown>
       }
     }
@@ -398,7 +402,93 @@ export async function generateArchitectReport(messages: ChatMessage[]): Promise<
     }
   }
 
-  // ─── 9 & 10. Recommendations (from AI final text) ───
+  // ─── 9. Lagrange Point Analysis ───
+
+  if (results.analyze_lagrange) {
+    const r = results.analyze_lagrange
+    const sys = r.system === 'sun-earth' ? 'Sun-Earth' : 'Earth-Moon'
+    addSectionTitle(`Lagrange Point Analysis (${sys} L${r.l_point})`)
+    addTable(
+      ['Parameter', 'Value'],
+      [
+        ['System', `${sys}`],
+        ['L-Point', `L${r.l_point}`],
+        ['Orbit Type', `${r.orbit_type}`],
+        ['L-Point Distance', `${Number(r.l_point_distance_km).toLocaleString()} km`],
+        ['Transfer \u0394V', `${r.transfer_delta_v_ms} m/s`],
+        ['Insertion \u0394V', `${r.insertion_delta_v_ms} m/s`],
+        ['Total \u0394V', `${r.total_delta_v_ms} m/s`],
+        ['Transfer Time', `${r.transfer_time_days} days`],
+        ['Station-Keeping', `${r.station_keeping_delta_v_ms_per_year} m/s/year`],
+        ['Orbit Period', `${r.orbit_period_days} days`],
+        ['Orbit Amplitude', `${Number(r.orbit_amplitude_km).toLocaleString()} km`],
+        ['Comms Distance', `${Number(r.comms_distance_km).toLocaleString()} km`],
+        ['Comms Delay', `${r.comms_delay_s} s`],
+        ['Stability', `${r.stability}`],
+      ]
+    )
+  }
+
+  // ─── 10. Lunar Transfer Analysis ───
+
+  if (results.analyze_lunar_transfer) {
+    const r = results.analyze_lunar_transfer
+    addSectionTitle('Lunar Transfer Analysis')
+    const missionLabel: Record<string, string> = {
+      'orbit-insertion': 'Orbit Insertion',
+      'flyby': 'Flyby',
+      'free-return': 'Free-Return',
+      'landing': 'Landing',
+    }
+    addTable(
+      ['Parameter', 'Value'],
+      [
+        ['Mission Type', missionLabel[r.mission_type as string] || `${r.mission_type}`],
+        ['TLI \u0394V', `${r.tli_delta_v_ms} m/s`],
+        ['LOI \u0394V', `${r.loi_delta_v_ms} m/s`],
+        ['Total \u0394V', `${r.total_delta_v_ms} m/s`],
+        ['Transfer Time', `${r.transfer_time_days} days`],
+        ['Phase Angle', `${r.phase_angle_deg}\u00B0`],
+        ['Spacecraft Mass (dry)', `${r.dry_mass_kg} kg`],
+        ['Propellant Required', `${r.propellant_mass_kg} kg`],
+        ['Isp', `${r.isp_s} s`],
+        ['Parking Orbit', `${r.parking_orbit_alt_km} km`],
+        ...(r.lunar_orbit_alt_km ? [['Lunar Orbit', `${r.lunar_orbit_alt_km} km`]] : []),
+        ...(r.closest_approach_km ? [['Closest Approach', `${r.closest_approach_km} km`]] : []),
+      ]
+    )
+  }
+
+  // ─── 11. Interplanetary Transfer Analysis ───
+
+  if (results.analyze_interplanetary) {
+    const r = results.analyze_interplanetary
+    const body = (r.target_body as string).charAt(0).toUpperCase() + (r.target_body as string).slice(1)
+    addSectionTitle(`Interplanetary Transfer Analysis (${body})`)
+    addTable(
+      ['Parameter', 'Value'],
+      [
+        ['Target', body],
+        ['Mission Type', `${r.mission_type}`],
+        ['Departure \u0394V', `${r.departure_delta_v_ms} m/s`],
+        ['Arrival \u0394V', `${r.arrival_delta_v_ms} m/s`],
+        ['Total \u0394V', `${r.total_delta_v_ms} m/s`],
+        ['C3 Energy', `${r.c3_km2_s2} km\u00B2/s\u00B2`],
+        ['V\u221E Departure', `${r.v_inf_depart_kms} km/s`],
+        ['V\u221E Arrival', `${r.v_inf_arrive_kms} km/s`],
+        ['Transfer Time', `${r.transfer_time_days} days (${r.transfer_time_years} years)`],
+        ['Phase Angle', `${r.phase_angle_deg}\u00B0`],
+        ['Synodic Period', `${r.synodic_period_days} days`],
+        ['Spacecraft Mass (dry)', `${r.dry_mass_kg} kg`],
+        ['Propellant Required', `${r.propellant_mass_kg} kg`],
+        ['Isp', `${r.isp_s} s`],
+        ['Comms Distance', `${r.comms_distance_au} AU`],
+        ['Comms Delay', `${r.comms_delay_s} s (one-way)`],
+      ]
+    )
+  }
+
+  // ─── 12. Recommendations (from AI final text) ───
 
   if (assistantText) {
     // Strip markdown formatting for PDF

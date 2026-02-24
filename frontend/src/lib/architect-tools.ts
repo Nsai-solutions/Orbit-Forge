@@ -15,6 +15,12 @@ import { computeBallisticCoefficient, estimateCrossSection, checkCompliance } fr
 import type { SolarActivity } from './orbital-lifetime'
 import { computeEOAnalysis } from './payload-eo'
 import { computeSATCOMAnalysis } from './payload-satcom'
+import { computeLagrangeResult } from './lagrange'
+import { computeLunarResult, computePropellantMass } from './lunar-transfer'
+import { computeInterplanetaryResult } from './interplanetary'
+import { PLANET_DATA } from './beyond-leo-constants'
+import type { LagrangePoint, LagrangeOrbitType, TargetBody } from '@/types/beyond-leo'
+import { BODY_ARRIVAL_DEFAULTS } from '@/types/beyond-leo'
 
 // ─── Tool Definitions (Anthropic API format) ───
 
@@ -165,6 +171,68 @@ export const TOOL_DEFINITIONS: AnthropicToolDef[] = [
       required: ['template', 'altitude_km', 'inclination_deg'],
     },
   },
+  {
+    name: 'analyze_lagrange',
+    description: 'Analyze a Lagrange point mission. Computes L-point position, transfer ΔV from LEO, station-keeping requirements, and halo/Lissajous orbit parameters. Use for missions to Sun-Earth or Earth-Moon Lagrange points (L1-L5).',
+    input_schema: {
+      type: 'object',
+      properties: {
+        system: { type: 'string', enum: ['sun-earth', 'earth-moon'], description: 'The three-body system' },
+        l_point: { type: 'integer', minimum: 1, maximum: 5, description: 'Which Lagrange point (1-5)' },
+        orbit_type: {
+          type: 'string', enum: ['halo', 'lissajous', 'lyapunov'],
+          description: 'Type of orbit around the L-point. Halo orbits are out-of-plane, Lissajous are quasi-periodic, Lyapunov are planar. Default to halo for most missions.',
+        },
+        orbit_amplitude_km: {
+          type: 'number',
+          description: 'Amplitude of the orbit around the L-point in km. Typical values: 250,000-800,000 km for Sun-Earth, 10,000-65,000 km for Earth-Moon. Use 500,000 km for Sun-Earth and 30,000 km for Earth-Moon as defaults.',
+        },
+        parking_orbit_alt_km: { type: 'number', description: 'Parking orbit altitude in km for transfer ΔV calculation. Default 200 km (standard LEO).' },
+      },
+      required: ['system', 'l_point'],
+    },
+  },
+  {
+    name: 'analyze_lunar_transfer',
+    description: 'Analyze a lunar transfer mission. Computes TLI ΔV, LOI ΔV, transfer time, phase angle, and propellant requirements. Supports orbit insertion, flyby, free-return, and landing mission types. NOTE: Lunar trajectory visualizations are still being refined — the numerical data is validated against Apollo reference values but the 3D visualization may not display correctly.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        mission_type: {
+          type: 'string', enum: ['orbit-insertion', 'flyby', 'free-return', 'landing'],
+          description: 'Type of lunar mission. Orbit insertion: enter lunar orbit. Flyby: gravity assist past Moon. Free-return: loop around Moon and return to Earth. Landing: descend to lunar surface.',
+        },
+        parking_orbit_alt_km: { type: 'number', description: 'Earth parking orbit altitude in km. Default 200 km.' },
+        lunar_orbit_alt_km: { type: 'number', description: 'Target lunar orbit altitude in km (for orbit insertion). Default 100 km. Not used for flyby/free-return.' },
+        closest_approach_km: { type: 'number', description: 'Closest approach distance to Moon surface in km (for flyby/free-return). Default 200 km for flyby, 250 km for free-return.' },
+        spacecraft_mass_kg: { type: 'number', description: 'Spacecraft dry mass in kg for propellant calculations. Default 10 kg.' },
+        isp_s: { type: 'number', description: 'Specific impulse of propulsion system in seconds. Default 220 s (cold gas). Use 300 s for bipropellant, 1500 s for electric propulsion.' },
+      },
+      required: ['mission_type'],
+    },
+  },
+  {
+    name: 'analyze_interplanetary',
+    description: 'Analyze an interplanetary transfer mission using Hohmann transfer calculations. Computes departure ΔV, arrival ΔV, C3 energy, transfer time, and propellant requirements for missions to any planet in the solar system.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        target_body: {
+          type: 'string', enum: ['mercury', 'venus', 'mars', 'jupiter', 'saturn', 'uranus', 'neptune', 'ceres', 'vesta'],
+          description: 'Target destination',
+        },
+        parking_orbit_alt_km: { type: 'number', description: 'Earth parking orbit altitude in km. Default 200 km.' },
+        capture_orbit_alt_km: { type: 'number', description: 'Target body capture orbit altitude in km. Uses per-body defaults (300 km for rocky, 2000 km for gas giants with elliptical capture).' },
+        spacecraft_mass_kg: { type: 'number', description: 'Spacecraft dry mass in kg. Default 500 kg.' },
+        isp_s: { type: 'number', description: 'Specific impulse in seconds. Default 320 s (bipropellant).' },
+        mission_type: {
+          type: 'string', enum: ['hohmann', 'flyby'],
+          description: 'Hohmann: minimum-energy transfer with orbit capture. Flyby: gravity assist trajectory (no capture burn). Default hohmann.',
+        },
+      },
+      required: ['target_body'],
+    },
+  },
 ]
 
 // ─── Tool Executors ───
@@ -257,6 +325,12 @@ export function executeToolCall(
       return executeAnalyzePayload(input)
     case 'set_visualization':
       return executeSetVisualization(input)
+    case 'analyze_lagrange':
+      return executeAnalyzeLagrange(input)
+    case 'analyze_lunar_transfer':
+      return executeAnalyzeLunarTransfer(input)
+    case 'analyze_interplanetary':
+      return executeAnalyzeInterplanetary(input)
     default:
       throw new Error(`Unknown tool: ${toolName}`)
   }
@@ -521,6 +595,208 @@ function executeAnalyzePayload(input: Record<string, unknown>): Record<string, u
   }
 
   throw new Error(`Unsupported payload type: ${payloadType}. Use 'earth-observation' or 'satcom'.`)
+}
+
+function executeAnalyzeLagrange(input: Record<string, unknown>): Record<string, unknown> {
+  const systemRaw = input.system as string
+  const system = systemRaw === 'sun-earth' ? 'SE' : 'EM' as const
+  const lPoint = input.l_point as number
+  const point = `L${lPoint}` as LagrangePoint
+  const orbitType = (input.orbit_type as LagrangeOrbitType) || 'halo'
+  const defaultAmp = system === 'SE' ? 500000 : 30000
+  const amplitudeKm = (input.orbit_amplitude_km as number) || defaultAmp
+  const departureAltKm = (input.parking_orbit_alt_km as number) || 200
+
+  const result = computeLagrangeResult({
+    system,
+    point,
+    orbitType,
+    amplitudeKm,
+    departureAltKm,
+    transferType: 'direct',
+    missionLifetimeYears: 5,
+    stationKeepingBudgetMs: 30,
+  })
+
+  // Sync to Beyond-LEO store
+  const store = useStore.getState()
+  store.setBeyondLeoMode('lagrange')
+  store.updateLagrangeParams({
+    system,
+    point,
+    orbitType,
+    amplitudeKm,
+    departureAltKm,
+    transferType: 'direct',
+    missionLifetimeYears: 5,
+  })
+
+  return {
+    system: systemRaw,
+    l_point: lPoint,
+    orbit_type: orbitType,
+    l_point_distance_km: +result.pointDistanceKm.toFixed(0),
+    transfer_delta_v_ms: +result.transferDeltaVms.toFixed(0),
+    insertion_delta_v_ms: +result.insertionDeltaVms.toFixed(0),
+    total_delta_v_ms: +result.totalDeltaVms.toFixed(0),
+    transfer_time_days: +result.transferTimeDays.toFixed(0),
+    station_keeping_delta_v_ms_per_year: +result.annualStationKeepingMs.toFixed(1),
+    orbit_period_days: +result.haloPeriodDays.toFixed(1),
+    orbit_amplitude_km: amplitudeKm,
+    comms_distance_km: +result.commsDistanceKm.toFixed(0),
+    comms_delay_s: +result.commsDelayS.toFixed(2),
+    stability: result.stabilityClass,
+    mission_total_delta_v_ms: +result.missionTotalDeltaVms.toFixed(0),
+    parking_orbit_alt_km: departureAltKm,
+  }
+}
+
+function executeAnalyzeLunarTransfer(input: Record<string, unknown>): Record<string, unknown> {
+  const missionTypeRaw = input.mission_type as string
+  // Map tool names to library types
+  const missionTypeMap: Record<string, string> = {
+    'orbit-insertion': 'orbit',
+    'flyby': 'flyby',
+    'free-return': 'free-return',
+    'landing': 'landing',
+  }
+  const missionType = (missionTypeMap[missionTypeRaw] || 'orbit') as 'orbit' | 'flyby' | 'landing' | 'free-return'
+
+  const departureAltKm = (input.parking_orbit_alt_km as number) || 200
+  const spacecraftMassKg = (input.spacecraft_mass_kg as number) || 10
+  const ispS = (input.isp_s as number) || 220
+
+  // Set targetOrbitAltKm based on mission type
+  let targetOrbitAltKm: number
+  if (missionType === 'flyby') {
+    targetOrbitAltKm = (input.closest_approach_km as number) || 200
+  } else if (missionType === 'free-return') {
+    targetOrbitAltKm = (input.closest_approach_km as number) || 250
+  } else {
+    targetOrbitAltKm = (input.lunar_orbit_alt_km as number) || 100
+  }
+
+  const result = computeLunarResult({
+    missionType,
+    targetOrbitAltKm,
+    targetOrbitIncDeg: 90,
+    transferType: 'hohmann',
+    departureAltKm,
+    spacecraftMassKg,
+    ispS,
+    propellantMassKg: 0,
+  })
+
+  // Sync to Beyond-LEO store
+  const store = useStore.getState()
+  store.setBeyondLeoMode('lunar')
+  store.updateLunarParams({
+    missionType,
+    targetOrbitAltKm,
+    departureAltKm,
+    spacecraftMassKg,
+    ispS,
+    transferType: 'hohmann',
+    propellantMassKg: result.propellantRequiredKg,
+  })
+
+  return {
+    mission_type: missionTypeRaw,
+    tli_delta_v_ms: +result.tliDeltaVms.toFixed(0),
+    loi_delta_v_ms: +result.loiDeltaVms.toFixed(0),
+    total_delta_v_ms: +result.totalDeltaVms.toFixed(0),
+    transfer_time_days: +result.transferTimeDays.toFixed(1),
+    phase_angle_deg: +result.phaseAngleDeg.toFixed(1),
+    propellant_mass_kg: +result.propellantRequiredKg.toFixed(1),
+    dry_mass_kg: +spacecraftMassKg.toFixed(1),
+    spacecraft_mass_kg: spacecraftMassKg,
+    isp_s: ispS,
+    closest_approach_km: (missionType === 'flyby' || missionType === 'free-return') ? targetOrbitAltKm : undefined,
+    lunar_orbit_alt_km: (missionType === 'orbit' || missionType === 'landing') ? targetOrbitAltKm : undefined,
+    parking_orbit_alt_km: departureAltKm,
+    comm_delay_s: +result.commDelayS.toFixed(2),
+    lunar_orbit_period_min: result.lunarOrbitPeriodMin > 0 ? +result.lunarOrbitPeriodMin.toFixed(1) : undefined,
+    free_return_period_days: result.freeReturnPeriodDays > 0 ? +result.freeReturnPeriodDays.toFixed(1) : undefined,
+    notes: 'TLI ΔV validated against Apollo missions (~3100-3200 m/s). Lunar trajectory visualization is still being refined.',
+  }
+}
+
+function executeAnalyzeInterplanetary(input: Record<string, unknown>): Record<string, unknown> {
+  const targetBody = input.target_body as TargetBody
+  const departureAltKm = (input.parking_orbit_alt_km as number) || 200
+  const spacecraftMassKg = (input.spacecraft_mass_kg as number) || 500
+  const ispS = (input.isp_s as number) || 320
+  const missionType = (input.mission_type as string) || 'hohmann'
+  const isFlyby = missionType === 'flyby'
+
+  // Use per-body defaults for capture orbit
+  const bodyDefaults = BODY_ARRIVAL_DEFAULTS[targetBody]
+  const captureOrbitAltKm = (input.capture_orbit_alt_km as number) || bodyDefaults.altKm
+
+  const result = computeInterplanetaryResult({
+    targetBody,
+    missionType: isFlyby ? 'flyby' : 'orbiter',
+    transferType: 'hohmann',
+    departureAltKm,
+    arrivalOrbitAltKm: captureOrbitAltKm,
+    arrivalOrbitType: bodyDefaults.orbitType,
+    captureApoFactor: bodyDefaults.apoFactor,
+    departureDateISO: '2026-07-01T00:00:00.000Z',
+    arrivalDateISO: '2027-01-15T00:00:00.000Z',
+    spacecraftMassKg,
+  })
+
+  // For flyby, no capture burn
+  const arrivalDvMs = isFlyby ? 0 : result.arrivalInsertionDeltaVms
+  const totalDvMs = result.departureDeltaVms + arrivalDvMs
+
+  // Compute propellant mass (Tsiolkovsky)
+  const propellantMassKg = computePropellantMass(totalDvMs, spacecraftMassKg, ispS)
+
+  // Phase angle: 180° - target's angular displacement during transfer
+  const planet = PLANET_DATA[targetBody]
+  const rawPhase = 180 - (360 / planet.orbitalPeriodDays) * result.transferTimeDays
+  const phaseAngleDeg = ((rawPhase % 360) + 360) % 360
+
+  // Sync to Beyond-LEO store
+  const store = useStore.getState()
+  store.setBeyondLeoMode('interplanetary')
+  store.updateInterplanetaryParams({
+    targetBody,
+    missionType: isFlyby ? 'flyby' : 'orbiter',
+    transferType: 'hohmann',
+    departureAltKm,
+    arrivalOrbitAltKm: captureOrbitAltKm,
+    arrivalOrbitType: bodyDefaults.orbitType,
+    captureApoFactor: bodyDefaults.apoFactor,
+    spacecraftMassKg,
+  })
+
+  return {
+    target_body: targetBody,
+    mission_type: missionType,
+    departure_delta_v_ms: +result.departureDeltaVms.toFixed(0),
+    arrival_delta_v_ms: +arrivalDvMs.toFixed(0),
+    total_delta_v_ms: +totalDvMs.toFixed(0),
+    c3_km2_s2: +result.c3Km2s2.toFixed(1),
+    v_inf_depart_kms: +Math.sqrt(result.c3Km2s2).toFixed(2),
+    v_inf_arrive_kms: +result.arrivalVinfKms.toFixed(2),
+    transfer_time_days: +result.transferTimeDays.toFixed(0),
+    transfer_time_years: +(result.transferTimeDays / 365.25).toFixed(2),
+    phase_angle_deg: +phaseAngleDeg.toFixed(1),
+    synodic_period_days: +result.synodicPeriodDays.toFixed(0),
+    propellant_mass_kg: +propellantMassKg.toFixed(1),
+    dry_mass_kg: +spacecraftMassKg.toFixed(1),
+    spacecraft_mass_kg: spacecraftMassKg,
+    isp_s: ispS,
+    parking_orbit_alt_km: departureAltKm,
+    capture_orbit_alt_km: captureOrbitAltKm,
+    comms_distance_au: +result.commsDistanceAU.toFixed(2),
+    comms_delay_s: +result.commsDelayS.toFixed(0),
+    planet_radius_km: result.planetRadiusKm,
+    planet_surface_gravity_ms2: +result.planetSurfaceGravityMs2.toFixed(2),
+    notes: 'Hohmann transfer provides minimum-energy trajectory. Actual missions often use slightly different trajectories for shorter transfer times at the cost of more ΔV.',
+  }
 }
 
 function executeSetVisualization(input: Record<string, unknown>): Record<string, unknown> {
