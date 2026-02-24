@@ -1,4 +1,5 @@
-import { Suspense, useRef } from 'react'
+import { Component, Suspense, useRef } from 'react'
+import type { ReactNode } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { OrbitControls } from '@react-three/drei'
 // Bloom disabled for performance — can re-enable later
@@ -18,6 +19,13 @@ import GroundStationMarkers from './GroundStationMarker'
 import { SatellitePositionProvider } from './SatellitePositionContext'
 import StationVisibilityCones from './StationVisibilityCone'
 import PayloadFootprint from './PayloadFootprint'
+
+/** Prevents overlay errors from crashing the entire 3D scene */
+class OverlayErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean }> {
+  state = { hasError: false }
+  static getDerivedStateFromError() { return { hasError: true } }
+  render() { return this.state.hasError ? null : this.props.children }
+}
 
 function AdaptiveControls() {
   const controlsRef = useRef<OrbitControlsType>(null)
@@ -81,12 +89,14 @@ export default function EarthScene() {
         <SatelliteMarker />
         <ApsisMarkers />
 
-        {/* Visibility & footprint overlays */}
-        <StationVisibilityCones
-          showCones={showCones}
-          showCommLinks={showCommLinks}
-        />
-        <PayloadFootprint showFootprint={showFootprint} />
+        {/* Visibility & footprint overlays — error-isolated from core scene */}
+        <OverlayErrorBoundary>
+          <StationVisibilityCones
+            showCones={showCones}
+            showCommLinks={showCommLinks}
+          />
+          <PayloadFootprint showFootprint={showFootprint} />
+        </OverlayErrorBoundary>
       </SatellitePositionProvider>
 
       <AdaptiveControls />

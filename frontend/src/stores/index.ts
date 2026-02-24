@@ -34,7 +34,7 @@ export const useStore = create<AppStore>()(
       }),
       {
         name: 'orbitforge-autosave',
-        version: 13,
+        version: 14,
         migrate: (persisted: any, version: number) => {
           if (version < 8) {
             const { groundStations, ...rest } = persisted || {}
@@ -58,6 +58,13 @@ export const useStore = create<AppStore>()(
                   spacecraft: { ...persisted.mission.spacecraft, pointingMode: 'nadir-pointing' },
                 },
               }
+            }
+          }
+          // v14: Reset ground stations to defaults (stale localStorage may have truncated list)
+          if (version < 14) {
+            if (persisted) {
+              const { groundStations: _gs, ...rest } = persisted
+              persisted = rest
             }
           }
           return persisted as any
