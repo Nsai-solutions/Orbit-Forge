@@ -5,6 +5,7 @@ import { useStore } from '@/stores'
 import { ModuleId } from '@/types'
 import EarthScene from '@/components/viewport/EarthScene'
 import BeyondLeoScene from '@/components/viewport/BeyondLeoScene'
+import OverlayTogglePanel from '@/components/viewport/OverlayTogglePanel'
 
 function LoadingFallback() {
   return (
@@ -24,6 +25,17 @@ function SceneSelector() {
     return <BeyondLeoScene />
   }
   return <EarthScene />
+}
+
+function ShowOverlayPanel() {
+  const activeModule = useStore((s) => s.activeModule)
+  // Only show overlay panel on tabs with the Earth globe
+  const showPanel =
+    activeModule === ModuleId.OrbitDesign ||
+    activeModule === ModuleId.GroundPasses ||
+    activeModule === ModuleId.Payload
+  if (!showPanel) return null
+  return <OverlayTogglePanel />
 }
 
 export default function CenterViewport() {
@@ -46,6 +58,7 @@ export default function CenterViewport() {
           <SceneSelector />
         </Canvas>
       </Suspense>
+      <ShowOverlayPanel />
     </div>
   )
 }

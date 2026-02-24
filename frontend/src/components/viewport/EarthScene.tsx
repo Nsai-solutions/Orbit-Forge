@@ -4,6 +4,7 @@ import { OrbitControls } from '@react-three/drei'
 // Bloom disabled for performance — can re-enable later
 // import { EffectComposer, Bloom } from '@react-three/postprocessing'
 import type { OrbitControls as OrbitControlsType } from 'three-stdlib'
+import { useStore } from '@/stores'
 import Earth from './Earth'
 import Atmosphere from './Atmosphere'
 import Starfield from './Starfield'
@@ -14,6 +15,9 @@ import ApsisMarkers from './ApsisMarkers'
 import GroundTrack from './GroundTrack'
 import CoordinateGrid from './CoordinateGrid'
 import GroundStationMarkers from './GroundStationMarker'
+import { SatellitePositionProvider } from './SatellitePositionContext'
+import StationVisibilityCones from './StationVisibilityCone'
+import PayloadFootprint from './PayloadFootprint'
 
 function AdaptiveControls() {
   const controlsRef = useRef<OrbitControlsType>(null)
@@ -51,6 +55,8 @@ function AdaptiveControls() {
 }
 
 export default function EarthScene() {
+  const overlayToggles = useStore((s) => s.overlayToggles)
+
   return (
     <>
       <SunLight />
@@ -66,18 +72,21 @@ export default function EarthScene() {
       <GroundTrack />
       <GroundStationMarkers />
 
-      {/* Orbit visualization */}
-      <OrbitLine />
-      <SatelliteMarker />
-      <ApsisMarkers />
+      <SatellitePositionProvider>
+        {/* Orbit visualization */}
+        <OrbitLine />
+        <SatelliteMarker />
+        <ApsisMarkers />
+
+        {/* Visibility & footprint overlays */}
+        <StationVisibilityCones
+          showCones={overlayToggles.stationCoverage}
+          showCommLinks={overlayToggles.commLinks}
+        />
+        <PayloadFootprint showFootprint={overlayToggles.sensorFootprint} />
+      </SatellitePositionProvider>
 
       <AdaptiveControls />
-
-      {/* Bloom disabled for performance — re-enable when needed:
-      <EffectComposer>
-        <Bloom intensity={0.4} luminanceThreshold={0.5} luminanceSmoothing={0.9} mipmapBlur />
-      </EffectComposer>
-      */}
     </>
   )
 }
