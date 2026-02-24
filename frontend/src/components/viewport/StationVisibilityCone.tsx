@@ -189,15 +189,11 @@ function CommLinkLines({ cones }: { cones: StationConeData[] }) {
   return <lineSegments ref={lineRef} geometry={geometry} material={material} />
 }
 
-export default function StationVisibilityCones({
-  showCones,
-  showCommLinks,
-}: {
-  showCones: boolean
-  showCommLinks: boolean
-}) {
+export default function StationVisibilityCones() {
   const groundStations = useStore((s) => s.groundStations)
   const semiMajorAxis = useStore((s) => s.elements.semiMajorAxis)
+  const showCones = useStore((s) => s.overlayToggles.stationCoverage)
+  const showCommLinks = useStore((s) => s.overlayToggles.commLinks)
   const altitudeKm = semiMajorAxis - R_EARTH_EQUATORIAL
 
   const cones = useMemo(
@@ -205,7 +201,7 @@ export default function StationVisibilityCones({
     [groundStations, altitudeKm],
   )
 
-  if (cones.length === 0) return null
+  if (cones.length === 0 || (!showCones && !showCommLinks)) return null
 
   return (
     <group>

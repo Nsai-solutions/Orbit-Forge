@@ -1,11 +1,9 @@
-import { Component, Suspense, useRef } from 'react'
-import type { ReactNode } from 'react'
+import { Suspense, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { OrbitControls } from '@react-three/drei'
 // Bloom disabled for performance — can re-enable later
 // import { EffectComposer, Bloom } from '@react-three/postprocessing'
 import type { OrbitControls as OrbitControlsType } from 'three-stdlib'
-import { useStore } from '@/stores'
 import Earth from './Earth'
 import Atmosphere from './Atmosphere'
 import Starfield from './Starfield'
@@ -19,13 +17,6 @@ import GroundStationMarkers from './GroundStationMarker'
 import { SatellitePositionProvider } from './SatellitePositionContext'
 import StationVisibilityCones from './StationVisibilityCone'
 import PayloadFootprint from './PayloadFootprint'
-
-/** Prevents overlay errors from crashing the entire 3D scene */
-class OverlayErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean }> {
-  state = { hasError: false }
-  static getDerivedStateFromError() { return { hasError: true } }
-  render() { return this.state.hasError ? null : this.props.children }
-}
 
 function AdaptiveControls() {
   const controlsRef = useRef<OrbitControlsType>(null)
@@ -63,11 +54,6 @@ function AdaptiveControls() {
 }
 
 export default function EarthScene() {
-  // Individual primitive selectors — avoids re-renders from unrelated store changes
-  const showCones = useStore((s) => s.overlayToggles.stationCoverage)
-  const showCommLinks = useStore((s) => s.overlayToggles.commLinks)
-  const showFootprint = useStore((s) => s.overlayToggles.sensorFootprint)
-
   return (
     <>
       <SunLight />
@@ -89,14 +75,9 @@ export default function EarthScene() {
         <SatelliteMarker />
         <ApsisMarkers />
 
-        {/* Visibility & footprint overlays — error-isolated from core scene */}
-        <OverlayErrorBoundary>
-          <StationVisibilityCones
-            showCones={showCones}
-            showCommLinks={showCommLinks}
-          />
-          <PayloadFootprint showFootprint={showFootprint} />
-        </OverlayErrorBoundary>
+        {/* Visibility & footprint overlays — read their own toggle state */}
+        <StationVisibilityCones />
+        <PayloadFootprint />
       </SatellitePositionProvider>
 
       <AdaptiveControls />

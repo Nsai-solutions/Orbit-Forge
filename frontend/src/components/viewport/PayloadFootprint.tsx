@@ -287,11 +287,8 @@ function RectangleFootprint({
   )
 }
 
-export default function PayloadFootprint({
-  showFootprint,
-}: {
-  showFootprint: boolean
-}) {
+export default function PayloadFootprint() {
+  const showFootprint = useStore((s) => s.overlayToggles.sensorFootprint)
   const params = useFootprintParams()
 
   if (!showFootprint || !params) return null
