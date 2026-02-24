@@ -1,4 +1,4 @@
-import { useMemo, useRef } from 'react'
+import { Suspense, lazy, useMemo, useRef } from 'react'
 import { Canvas, useFrame } from '@react-three/fiber'
 import { Line, OrbitControls } from '@react-three/drei'
 import * as THREE from 'three'
@@ -8,6 +8,11 @@ import Earth from '@/components/viewport/Earth'
 import Atmosphere from '@/components/viewport/Atmosphere'
 import { geodeticToThreeJS } from '@/lib/coordinate-transforms'
 import { R_EARTH_EQUATORIAL } from '@/lib/constants'
+
+// Lazy-load Beyond-LEO scenes to avoid pulling them into the main bundle unless used
+const LagrangeScene = lazy(() => import('@/components/viewport/LagrangeScene'))
+const LunarScene = lazy(() => import('@/components/viewport/LunarScene'))
+const SolarSystemScene = lazy(() => import('@/components/viewport/SolarSystemScene'))
 
 // ─── Constants ───
 
@@ -137,7 +142,7 @@ function SatelliteDot({ altKm, incDeg, raanDeg = 0, speed = 0.15 }: {
 
 // ─── Ground Station Marker ───
 
-function StationMarker({ lat, lon, name }: { lat: number; lon: number; name: string }) {
+function StationMarker({ lat, lon }: { lat: number; lon: number; name: string }) {
   const pos = useMemo(() => {
     const p = geodeticToThreeJS(lat, lon, 1.003)
     return [p.x, p.y, p.z] as [number, number, number]
@@ -209,13 +214,13 @@ function AutoRotate({ children }: { children: React.ReactNode }) {
   return <group ref={groupRef}>{children}</group>
 }
 
-// ─── Template Scenes ───
+// ─── LEO Template Scenes ───
 
 function LEOOrbitScene({ params }: { params: ArchitectVisualization['params'] }) {
   return (
     <>
-      <OrbitRing altKm={params.altitude_km} incDeg={params.inclination_deg} />
-      <SatelliteDot altKm={params.altitude_km} incDeg={params.inclination_deg} />
+      <OrbitRing altKm={params.altitude_km!} incDeg={params.inclination_deg!} />
+      <SatelliteDot altKm={params.altitude_km!} incDeg={params.inclination_deg!} />
     </>
   )
 }
@@ -223,8 +228,8 @@ function LEOOrbitScene({ params }: { params: ArchitectVisualization['params'] })
 function LEOWithStationsScene({ params }: { params: ArchitectVisualization['params'] }) {
   return (
     <>
-      <OrbitRing altKm={params.altitude_km} incDeg={params.inclination_deg} />
-      <SatelliteDot altKm={params.altitude_km} incDeg={params.inclination_deg} />
+      <OrbitRing altKm={params.altitude_km!} incDeg={params.inclination_deg!} />
+      <SatelliteDot altKm={params.altitude_km!} incDeg={params.inclination_deg!} />
       {params.stations?.map((s, i) => (
         <StationMarker key={i} lat={s.lat} lon={s.lon} name={s.name} />
       ))}
@@ -245,8 +250,8 @@ function ConstellationScene({ params }: { params: ArchitectVisualization['params
         return (
           <group key={p}>
             <OrbitRing
-              altKm={params.altitude_km}
-              incDeg={params.inclination_deg}
+              altKm={params.altitude_km!}
+              incDeg={params.inclination_deg!}
               raanDeg={raanDeg}
               color={color}
               lineWidth={1}
@@ -255,8 +260,8 @@ function ConstellationScene({ params }: { params: ArchitectVisualization['params
             {Array.from({ length: satsPerPlane }, (_, s) => (
               <SatelliteDot
                 key={s}
-                altKm={params.altitude_km}
-                incDeg={params.inclination_deg}
+                altKm={params.altitude_km!}
+                incDeg={params.inclination_deg!}
                 raanDeg={raanDeg}
                 speed={0.15 + s * (0.001)} // slight offset so they spread
               />
@@ -271,12 +276,12 @@ function ConstellationScene({ params }: { params: ArchitectVisualization['params
 function GroundCoverageScene({ params }: { params: ArchitectVisualization['params'] }) {
   return (
     <>
-      <OrbitRing altKm={params.altitude_km} incDeg={params.inclination_deg} />
-      <SatelliteDot altKm={params.altitude_km} incDeg={params.inclination_deg} />
+      <OrbitRing altKm={params.altitude_km!} incDeg={params.inclination_deg!} />
+      <SatelliteDot altKm={params.altitude_km!} incDeg={params.inclination_deg!} />
       {params.swath_width_km && (
         <SwathFootprint
-          altKm={params.altitude_km}
-          incDeg={params.inclination_deg}
+          altKm={params.altitude_km!}
+          incDeg={params.inclination_deg!}
           swathWidthKm={params.swath_width_km}
         />
       )}
@@ -287,9 +292,9 @@ function GroundCoverageScene({ params }: { params: ArchitectVisualization['param
   )
 }
 
-// ─── Scene Wrapper ───
+// ─── LEO Scene Wrapper ───
 
-function TemplateScene({ viz }: { viz: ArchitectVisualization }) {
+function LEOTemplateScene({ viz }: { viz: ArchitectVisualization }) {
   switch (viz.template) {
     case 'leo-orbit':
       return <LEOOrbitScene params={viz.params} />
@@ -299,11 +304,12 @@ function TemplateScene({ viz }: { viz: ArchitectVisualization }) {
       return <ConstellationScene params={viz.params} />
     case 'ground-coverage':
       return <GroundCoverageScene params={viz.params} />
+    default:
+      return null
   }
 }
 
-function SceneContent({ viz }: { viz: ArchitectVisualization }) {
-  // Key forces full scene remount when template or params change
+function LEOSceneContent({ viz }: { viz: ArchitectVisualization }) {
   const sceneKey = `${viz.template}-${viz.params.altitude_km}-${viz.params.inclination_deg}`
 
   return (
@@ -314,7 +320,7 @@ function SceneContent({ viz }: { viz: ArchitectVisualization }) {
       <AutoRotate key={sceneKey}>
         <Earth />
         <Atmosphere />
-        <TemplateScene viz={viz} />
+        <LEOTemplateScene viz={viz} />
       </AutoRotate>
 
       <OrbitControls
@@ -328,6 +334,57 @@ function SceneContent({ viz }: { viz: ArchitectVisualization }) {
   )
 }
 
+// ─── Template Labels ───
+
+const TEMPLATE_LABELS: Record<string, string> = {
+  'leo-orbit': 'LEO Orbit',
+  'leo-with-stations': 'LEO + Ground Stations',
+  'constellation': 'Constellation',
+  'ground-coverage': 'Ground Coverage',
+  'lagrange-halo': 'Lagrange Halo Orbit',
+  'lagrange-lissajous': 'Lagrange Lissajous Orbit',
+  'lagrange-lyapunov': 'Lagrange Lyapunov Orbit',
+  'lagrange-transfer-only': 'Lagrange Transfer',
+  'lunar-orbit-insertion': 'Lunar Orbit Insertion',
+  'lunar-flyby': 'Lunar Flyby',
+  'lunar-free-return': 'Lunar Free-Return',
+  'lunar-landing': 'Lunar Landing',
+  'interplanetary-hohmann': 'Interplanetary Transfer',
+  'interplanetary-flyby': 'Interplanetary Flyby',
+  'interplanetary-with-capture': 'Interplanetary Capture',
+  'interplanetary-porkchop': 'Launch Window Analysis',
+}
+
+function getSubtitle(viz: ArchitectVisualization): string {
+  const { template, params } = viz
+  if (template.startsWith('leo-') || template === 'constellation' || template === 'ground-coverage') {
+    return `${params.altitude_km ?? '—'} km \u00B7 ${params.inclination_deg ?? '—'}\u00B0`
+  }
+  if (template.startsWith('lagrange-')) {
+    const sys = params.system === 'earth-moon' ? 'Earth-Moon' : 'Sun-Earth'
+    return `${sys} L${params.l_point ?? 2}`
+  }
+  if (template.startsWith('lunar-')) {
+    return params.mission_type?.replace('-', ' ') || 'Transfer'
+  }
+  if (template.startsWith('interplanetary-')) {
+    const body = params.target_body || 'mars'
+    return body.charAt(0).toUpperCase() + body.slice(1)
+  }
+  return ''
+}
+
+// ─── Beyond-LEO Scene Helper ───
+
+function BeyondLEOFallback() {
+  return (
+    <mesh>
+      <sphereGeometry args={[0.02, 8, 8]} />
+      <meshBasicMaterial color="#22D3EE" />
+    </mesh>
+  )
+}
+
 // ─── Main Component ───
 
 export default function MissionVisualization() {
@@ -335,31 +392,46 @@ export default function MissionVisualization() {
 
   if (!viz) return null
 
-  const templateLabels: Record<string, string> = {
-    'leo-orbit': 'LEO Orbit',
-    'leo-with-stations': 'LEO + Ground Stations',
-    'constellation': 'Constellation',
-    'ground-coverage': 'Ground Coverage',
-  }
+  const isLEO = viz.template.startsWith('leo-') || viz.template === 'constellation' || viz.template === 'ground-coverage'
+  const isLagrange = viz.template.startsWith('lagrange-')
+  const isLunar = viz.template.startsWith('lunar-')
+  const isInterplanetary = viz.template.startsWith('interplanetary-')
 
   return (
     <div className="rounded border border-white/5 bg-space-900/30 overflow-hidden">
       <div className="h-8 flex items-center px-3 border-b border-white/5">
         <span className="text-[10px] font-mono uppercase tracking-wider text-[var(--text-tertiary)]">
-          {templateLabels[viz.template] || 'Visualization'}
+          {TEMPLATE_LABELS[viz.template] || 'Visualization'}
         </span>
         <span className="ml-auto text-[10px] text-[var(--text-tertiary)]">
-          {viz.params.altitude_km} km · {viz.params.inclination_deg}°
+          {getSubtitle(viz)}
         </span>
       </div>
       <div className="h-[240px] bg-black/40">
-        <Canvas
-          camera={{ position: [0, 1.5, 3], fov: 40 }}
-          gl={{ antialias: true, alpha: true }}
-          dpr={[1, 1.5]}
-        >
-          <SceneContent viz={viz} />
-        </Canvas>
+        {isLEO && (
+          <Canvas
+            camera={{ position: [0, 1.5, 3], fov: 40 }}
+            gl={{ antialias: true, alpha: true }}
+            dpr={[1, 1.5]}
+          >
+            <LEOSceneContent viz={viz} />
+          </Canvas>
+        )}
+
+        {(isLagrange || isLunar || isInterplanetary) && (
+          <Canvas
+            camera={{ position: [0, 0.8, 3], fov: 45, near: 0.01, far: 1000 }}
+            dpr={[1, 1.5]}
+            gl={{ antialias: true, alpha: true }}
+            style={{ background: '#0A0E17' }}
+          >
+            <Suspense fallback={<BeyondLEOFallback />}>
+              {isLagrange && <LagrangeScene />}
+              {isLunar && <LunarScene />}
+              {isInterplanetary && <SolarSystemScene />}
+            </Suspense>
+          </Canvas>
+        )}
       </div>
     </div>
   )

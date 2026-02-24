@@ -110,8 +110,17 @@ function extractResultSections(messages: ChatMessage[]): ResultSection[] {
   const sections: ResultSection[] = []
   const seen = new Set<string>()
 
-  // Walk messages in reverse to get the latest result for each tool
+  // Find the last user message — only show results from the current analysis round
+  let lastUserIdx = -1
   for (let i = messages.length - 1; i >= 0; i--) {
+    if (messages[i].role === 'user') {
+      lastUserIdx = i
+      break
+    }
+  }
+
+  // Walk messages in reverse (after last user msg) to get the latest result for each tool
+  for (let i = messages.length - 1; i > lastUserIdx; i--) {
     const msg = messages[i]
     if (msg.role !== 'assistant' || !msg.toolCalls) continue
 

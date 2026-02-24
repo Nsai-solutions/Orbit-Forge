@@ -1,15 +1,37 @@
 import { StateCreator } from 'zustand'
 import type { ChatMessage, MissionSummarySection } from '@/types/architect'
 
+export type ArchitectVizTemplate =
+  // LEO templates
+  | 'leo-orbit' | 'leo-with-stations' | 'constellation' | 'ground-coverage'
+  // Lagrange templates
+  | 'lagrange-halo' | 'lagrange-lissajous' | 'lagrange-lyapunov' | 'lagrange-transfer-only'
+  // Lunar templates
+  | 'lunar-orbit-insertion' | 'lunar-flyby' | 'lunar-free-return' | 'lunar-landing'
+  // Interplanetary templates
+  | 'interplanetary-hohmann' | 'interplanetary-flyby' | 'interplanetary-with-capture' | 'interplanetary-porkchop'
+
 export interface ArchitectVisualization {
-  template: 'leo-orbit' | 'leo-with-stations' | 'constellation' | 'ground-coverage'
+  template: ArchitectVizTemplate
   params: {
-    altitude_km: number
-    inclination_deg: number
+    // LEO params
+    altitude_km?: number
+    inclination_deg?: number
     stations?: { name: string; lat: number; lon: number }[]
     num_planes?: number
     sats_per_plane?: number
     swath_width_km?: number
+    // Lagrange params
+    system?: string
+    l_point?: number
+    orbit_type?: string
+    amplitude_km?: number
+    // Lunar params
+    mission_type?: string
+    lunar_orbit_alt_km?: number
+    closest_approach_km?: number
+    // Interplanetary params
+    target_body?: string
   }
 }
 

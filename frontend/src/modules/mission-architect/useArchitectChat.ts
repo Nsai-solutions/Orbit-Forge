@@ -86,6 +86,9 @@ export function useArchitectChat() {
     setArchitectError(null)
     setArchitectStreaming(true)
 
+    // Clear previous visualization so stale scenes don't persist
+    store.setArchitectVisualization(null)
+
     // Add user message
     const userId = nextId()
     const userMsg: ChatMessage = {
@@ -245,15 +248,30 @@ export function useArchitectChat() {
         for (const tc of executedToolCalls) {
           if (tc.toolName === 'set_visualization' && tc.status === 'complete' && tc.output) {
             const vizOutput = tc.output as Record<string, unknown>
+            const template = vizOutput.template as string
+            const vizParams = (vizOutput.params as Record<string, unknown>) || {}
+
             store.setArchitectVisualization({
-              template: vizOutput.template as 'leo-orbit' | 'leo-with-stations' | 'constellation' | 'ground-coverage',
+              template: template as import('@/stores/architect-slice').ArchitectVizTemplate,
               params: {
-                altitude_km: vizOutput.altitude_km as number,
-                inclination_deg: vizOutput.inclination_deg as number,
-                stations: vizOutput.stations as { name: string; lat: number; lon: number }[] | undefined,
-                num_planes: vizOutput.num_planes as number | undefined,
-                sats_per_plane: vizOutput.sats_per_plane as number | undefined,
-                swath_width_km: vizOutput.swath_width_km as number | undefined,
+                // LEO params
+                altitude_km: vizParams.altitude_km as number | undefined,
+                inclination_deg: vizParams.inclination_deg as number | undefined,
+                stations: vizParams.ground_stations as { name: string; lat: number; lon: number }[] | undefined,
+                num_planes: vizParams.num_planes as number | undefined,
+                sats_per_plane: vizParams.sats_per_plane as number | undefined,
+                swath_width_km: vizParams.swath_width_km as number | undefined,
+                // Lagrange params
+                system: vizParams.system as string | undefined,
+                l_point: vizParams.l_point as number | undefined,
+                orbit_type: vizParams.orbit_type as string | undefined,
+                amplitude_km: vizParams.amplitude_km as number | undefined,
+                // Lunar params
+                mission_type: vizParams.mission_type as string | undefined,
+                lunar_orbit_alt_km: vizParams.lunar_orbit_alt_km as number | undefined,
+                closest_approach_km: vizParams.closest_approach_km as number | undefined,
+                // Interplanetary params
+                target_body: vizParams.target_body as string | undefined,
               },
             })
           }

@@ -140,35 +140,52 @@ export const TOOL_DEFINITIONS: AnthropicToolDef[] = [
   },
   {
     name: 'set_visualization',
-    description: 'Set the 3D visualization in the results panel. Call this after analyze_orbit to show the mission visually. Choose a template that best matches the mission type and pass the orbital parameters.',
+    description: 'Set the 3D visualization in the Mission Summary panel. Choose the appropriate template based on the mission type. For LEO missions use leo-orbit, leo-with-stations, ground-coverage, or constellation. For Beyond-LEO missions use the lagrange, lunar, or interplanetary templates.',
     input_schema: {
       type: 'object',
       properties: {
         template: {
           type: 'string',
-          enum: ['leo-orbit', 'leo-with-stations', 'constellation', 'ground-coverage'],
-          description: 'Visualization template: leo-orbit (single orbit ring), leo-with-stations (orbit + ground station markers), constellation (Walker constellation with multiple planes), ground-coverage (orbit + swath footprint)',
+          enum: [
+            'leo-orbit', 'leo-with-stations', 'ground-coverage', 'constellation',
+            'lagrange-halo', 'lagrange-lissajous', 'lagrange-lyapunov', 'lagrange-transfer-only',
+            'lunar-orbit-insertion', 'lunar-flyby', 'lunar-free-return', 'lunar-landing',
+            'interplanetary-hohmann', 'interplanetary-flyby', 'interplanetary-with-capture', 'interplanetary-porkchop',
+          ],
+          description: 'The visualization template to use. Pick based on mission type.',
         },
-        altitude_km: { type: 'number', description: 'Orbital altitude in km' },
-        inclination_deg: { type: 'number', description: 'Orbital inclination in degrees' },
-        stations: {
-          type: 'array',
-          description: 'Ground stations to show (for leo-with-stations template)',
-          items: {
-            type: 'object',
-            properties: {
-              name: { type: 'string' },
-              lat: { type: 'number', description: 'Latitude in degrees' },
-              lon: { type: 'number', description: 'Longitude in degrees' },
+        params: {
+          type: 'object',
+          description: 'Parameters to customize the visualization. Varies by template.',
+          properties: {
+            altitude_km: { type: 'number', description: 'LEO orbital altitude in km' },
+            inclination_deg: { type: 'number', description: 'LEO orbital inclination in degrees' },
+            system: { type: 'string', enum: ['sun-earth', 'earth-moon'], description: 'Three-body system for Lagrange visualizations' },
+            l_point: { type: 'integer', description: 'Lagrange point number (1-5)' },
+            orbit_type: { type: 'string', enum: ['halo', 'lissajous', 'lyapunov'], description: 'Orbit type around the L-point' },
+            amplitude_km: { type: 'number', description: 'Orbit amplitude in km' },
+            mission_type: { type: 'string', enum: ['orbit-insertion', 'flyby', 'free-return', 'landing'], description: 'Type of lunar mission' },
+            lunar_orbit_alt_km: { type: 'number', description: 'Lunar orbit altitude for orbit insertion' },
+            closest_approach_km: { type: 'number', description: 'Closest approach distance for flyby/free-return' },
+            target_body: { type: 'string', enum: ['mercury', 'venus', 'mars', 'jupiter', 'saturn', 'uranus', 'neptune'], description: 'Target planet for interplanetary visualizations' },
+            ground_stations: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  name: { type: 'string' },
+                  lat: { type: 'number' },
+                  lon: { type: 'number' },
+                },
+              },
             },
-            required: ['name', 'lat', 'lon'],
+            num_planes: { type: 'number', description: 'Number of orbital planes (for constellation template)' },
+            sats_per_plane: { type: 'number', description: 'Satellites per plane (for constellation template)' },
+            swath_width_km: { type: 'number', description: 'Sensor swath width in km (for ground-coverage template)' },
           },
         },
-        num_planes: { type: 'number', description: 'Number of orbital planes (for constellation template)' },
-        sats_per_plane: { type: 'number', description: 'Satellites per plane (for constellation template)' },
-        swath_width_km: { type: 'number', description: 'Sensor swath width in km (for ground-coverage template)' },
       },
-      required: ['template', 'altitude_km', 'inclination_deg'],
+      required: ['template'],
     },
   },
   {
@@ -803,27 +820,62 @@ function executeSetVisualization(input: Record<string, unknown>): Record<string,
   // This tool returns the visualization config for the store.
   // The actual store update is handled by useArchitectChat after tool execution.
   const template = input.template as string
-  const altKm = input.altitude_km as number
-  const incDeg = input.inclination_deg as number
+  const params = (input.params as Record<string, unknown>) || {}
+
+  // For Beyond-LEO templates, also update the Beyond-LEO store
+  const store = useStore.getState()
+
+  if (template.startsWith('lagrange-')) {
+    const system = params.system === 'earth-moon' ? 'EM' : 'SE' as const
+    const lPoint = (params.l_point as number) || 2
+    const orbitType = (params.orbit_type as string) || template.replace('lagrange-', '') || 'halo'
+    const defaultAmp = system === 'SE' ? 500000 : 30000
+    const amplitudeKm = (params.amplitude_km as number) || defaultAmp
+
+    store.setBeyondLeoMode('lagrange')
+    store.updateLagrangeParams({
+      system,
+      point: `L${lPoint}` as LagrangePoint,
+      orbitType: (orbitType === 'transfer-only' ? 'halo' : orbitType) as LagrangeOrbitType,
+      amplitudeKm,
+      departureAltKm: 200,
+      transferType: 'direct',
+    })
+  } else if (template.startsWith('lunar-')) {
+    const missionTypeMap: Record<string, string> = {
+      'lunar-orbit-insertion': 'orbit',
+      'lunar-flyby': 'flyby',
+      'lunar-free-return': 'free-return',
+      'lunar-landing': 'landing',
+    }
+    const missionType = (missionTypeMap[template] || params.mission_type || 'orbit') as 'orbit' | 'flyby' | 'free-return' | 'landing'
+    const targetOrbitAltKm = (missionType === 'flyby' || missionType === 'free-return')
+      ? (params.closest_approach_km as number) || 200
+      : (params.lunar_orbit_alt_km as number) || 100
+
+    store.setBeyondLeoMode('lunar')
+    store.updateLunarParams({
+      missionType,
+      targetOrbitAltKm,
+      departureAltKm: 200,
+      transferType: 'hohmann',
+    })
+  } else if (template.startsWith('interplanetary-')) {
+    const targetBody = (params.target_body as TargetBody) || 'mars'
+
+    store.setBeyondLeoMode('interplanetary')
+    store.updateInterplanetaryParams({
+      targetBody,
+      missionType: template === 'interplanetary-flyby' ? 'flyby' : 'orbiter',
+      transferType: 'hohmann',
+      departureAltKm: 200,
+    })
+  }
 
   const result: Record<string, unknown> = {
     template,
-    altitude_km: altKm,
-    inclination_deg: incDeg,
+    params,
     status: 'visualization_set',
-  }
-
-  if (input.stations) {
-    result.stations = input.stations
-  }
-  if (input.num_planes) {
-    result.num_planes = input.num_planes
-  }
-  if (input.sats_per_plane) {
-    result.sats_per_plane = input.sats_per_plane
-  }
-  if (input.swath_width_km) {
-    result.swath_width_km = input.swath_width_km
   }
 
   return result

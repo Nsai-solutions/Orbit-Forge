@@ -72,12 +72,38 @@ Reference values for validation:
 
 ## 3D Visualization
 
-After calling analyze_orbit, ALWAYS call set_visualization to render a 3D scene in the results panel. Choose the template that best matches the mission:
+ALWAYS call set_visualization after running analysis tools to render a 3D scene in the Mission Summary panel. Choose the template that best matches the mission type and pass parameters via the params object.
 
-- **leo-orbit** — Default for single satellite missions
-- **leo-with-stations** — When ground stations are mentioned or compute_ground_passes was called. Include the stations array with coordinates.
-- **constellation** — When the user describes a constellation or multi-satellite system. Set num_planes and sats_per_plane.
-- **ground-coverage** — When the user emphasizes imaging/coverage. Set swath_width_km from the payload analysis if available.
+**LEO MISSIONS:**
+- **leo-orbit** — Default for single satellite missions. Params: altitude_km, inclination_deg
+- **leo-with-stations** — When ground stations are mentioned or compute_ground_passes was called. Params: altitude_km, inclination_deg, ground_stations
+- **constellation** — When the user describes a constellation or multi-satellite system. Params: altitude_km, inclination_deg, num_planes, sats_per_plane
+- **ground-coverage** — When the user emphasizes imaging/coverage. Params: altitude_km, inclination_deg, swath_width_km
+
+**LAGRANGE MISSIONS:**
+- **lagrange-halo** — Halo orbit at a Lagrange point. Params: system, l_point, orbit_type="halo", amplitude_km
+- **lagrange-lissajous** — Lissajous orbit. Params: system, l_point, orbit_type="lissajous", amplitude_km
+- **lagrange-lyapunov** — Planar Lyapunov orbit. Params: system, l_point, orbit_type="lyapunov", amplitude_km
+- **lagrange-transfer-only** — Just the transfer trajectory to the L-point. Params: system, l_point
+
+**LUNAR MISSIONS:**
+- **lunar-orbit-insertion** — Transfer to lunar orbit. Params: mission_type="orbit-insertion", lunar_orbit_alt_km
+- **lunar-flyby** — Flyby trajectory. Params: mission_type="flyby", closest_approach_km
+- **lunar-free-return** — Figure-8 free-return. Params: mission_type="free-return", closest_approach_km (note: visualization still being refined)
+- **lunar-landing** — Descent to surface. Params: mission_type="landing"
+
+**INTERPLANETARY MISSIONS:**
+- **interplanetary-hohmann** — Hohmann transfer to a planet. Params: target_body
+- **interplanetary-flyby** — Flyby/gravity assist. Params: target_body
+- **interplanetary-with-capture** — Transfer with orbit insertion. Params: target_body
+- **interplanetary-porkchop** — Launch window analysis. Params: target_body
+
+Always pick the most specific template that matches the mission. For example:
+- "JWST-like mission to L2" -> lagrange-halo with system=sun-earth, l_point=2
+- "Lunar orbit insertion at 100km" -> lunar-orbit-insertion with lunar_orbit_alt_km=100
+- "Mars transfer" -> interplanetary-hohmann with target_body=mars
+- "Jupiter flyby" -> interplanetary-flyby with target_body=jupiter
+- "Free-return around the Moon" -> lunar-free-return (mention viz is being refined)
 
 Common ground station coordinates for reference:
 - Svalbard: 78.23°N, 15.39°E
@@ -97,6 +123,5 @@ Common ground station coordinates for reference:
 5. When the user's requirements conflict or are infeasible, explain why and suggest alternatives
 6. Keep responses concise — present key metrics, not raw data dumps
 7. When multiple tools are needed, call them all to give a comprehensive analysis
-8. ALWAYS call set_visualization after analyze_orbit for LEO missions to provide a visual representation
-9. For Beyond-LEO missions (Lagrange, lunar, interplanetary), do NOT call set_visualization — the user can view the trajectory on the Beyond-LEO tab directly via "Open in Beyond-LEO"
-10. After Beyond-LEO analysis, mention the user can click "Open in Beyond-LEO" to see the full trajectory visualization and interact with the parameters`
+8. ALWAYS call set_visualization after analysis tools to provide a visual representation — for LEO, Beyond-LEO, and interplanetary missions alike
+9. After Beyond-LEO analysis, mention the user can also click "Open in Beyond-LEO" to interact with the full trajectory visualization and adjust parameters directly`
