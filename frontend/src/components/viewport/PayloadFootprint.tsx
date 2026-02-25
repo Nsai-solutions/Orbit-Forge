@@ -7,7 +7,7 @@ import { R_EARTH_EQUATORIAL, DEG2RAD } from '@/lib/constants'
 import { computeEOAnalysis } from '@/lib/payload-eo'
 import { computeSARAnalysis } from '@/lib/payload-sar'
 import { computeSATCOMAnalysis } from '@/lib/payload-satcom'
-import { useSatellitePosition } from './SatellitePositionContext'
+import { sharedSatellitePosition } from './SatellitePositionContext'
 
 const FOOTPRINT_COLOR = new THREE.Color('#06B6D4')
 const FOOTPRINT_SURFACE_R = 1.005 // slightly above globe
@@ -86,7 +86,6 @@ function useFootprintParams(): FootprintParams | null {
 function CircleFootprint({ radiusKm }: { radiusKm: number }) {
   const meshRef = useRef<THREE.Mesh>(null)
   const lineRef = useRef<THREE.Group>(null)
-  const { positionRef } = useSatellitePosition()
 
   // Pre-allocate geometry: center + CIRCLE_SEGMENTS perimeter = triangle fan
   const { fillGeo, borderPoints } = useMemo(() => {
@@ -118,7 +117,7 @@ function CircleFootprint({ radiusKm }: { radiusKm: number }) {
 
   useFrame(() => {
     if (!meshRef.current) return
-    _satPos.copy(positionRef.current)
+    _satPos.copy(sharedSatellitePosition)
     if (_satPos.lengthSq() < 0.001) return // satellite not yet positioned
 
     // Subsatellite point (project onto globe surface)
@@ -190,7 +189,6 @@ function RectangleFootprint({
   alongTrackKm: number
 }) {
   const meshRef = useRef<THREE.Mesh>(null)
-  const { positionRef } = useSatellitePosition()
   const elements = useStore((s) => s.elements)
 
   // Pre-allocate: 4 corner quad = 2 triangles
@@ -219,7 +217,7 @@ function RectangleFootprint({
 
   useFrame(() => {
     if (!meshRef.current) return
-    _satPos.copy(positionRef.current)
+    _satPos.copy(sharedSatellitePosition)
     if (_satPos.lengthSq() < 0.001) return
 
     _up.copy(_satPos).normalize()

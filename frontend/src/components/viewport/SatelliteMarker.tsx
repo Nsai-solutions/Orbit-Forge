@@ -5,7 +5,7 @@ import { getSatellitePosition } from '@/lib/orbital-mechanics'
 import { keplerianToCartesian, eciToEcef, ecefToGeodetic } from '@/lib/coordinate-transforms'
 import { MU_EARTH_KM } from '@/lib/constants'
 import { dateToGMST } from '@/lib/time-utils'
-import { useSatellitePosition } from './SatellitePositionContext'
+import { sharedSatellitePosition, sharedSatellitePhase } from './SatellitePositionContext'
 import * as THREE from 'three'
 
 export default function SatelliteMarker() {
@@ -17,9 +17,6 @@ export default function SatelliteMarker() {
   // Read elements once — re-reads on store change via selector
   const elements = useStore((s) => s.elements)
   const setSatSubPoint = useStore((s) => s.setSatSubPoint)
-
-  // Shared position context — overlay components read this every frame
-  const { positionRef: sharedPositionRef, phaseRef: sharedPhaseRef } = useSatellitePosition()
 
   useFrame((_, delta) => {
     if (!groupRef.current) return
@@ -33,9 +30,9 @@ export default function SatelliteMarker() {
     const pos = getSatellitePosition({ ...elements, trueAnomaly })
     groupRef.current.position.set(pos.x, pos.y, pos.z)
 
-    // Write to shared context for overlay components
-    sharedPositionRef.current.set(pos.x, pos.y, pos.z)
-    sharedPhaseRef.current = phaseRef.current
+    // Write to shared module-level refs for overlay components
+    sharedSatellitePosition.set(pos.x, pos.y, pos.z)
+    sharedSatellitePhase.current = phaseRef.current
 
     // Update subsatellite point for 2D ground track sync (~5Hz to avoid perf issues)
     subPointTimer.current += delta

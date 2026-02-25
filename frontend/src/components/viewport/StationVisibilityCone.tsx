@@ -5,7 +5,7 @@ import * as THREE from 'three'
 import { useStore } from '@/stores'
 import { geodeticToThreeJS } from '@/lib/coordinate-transforms'
 import { R_EARTH_EQUATORIAL, DEG2RAD } from '@/lib/constants'
-import { useSatellitePosition } from './SatellitePositionContext'
+import { sharedSatellitePosition } from './SatellitePositionContext'
 
 const CIRCLE_SEGMENTS = 48
 const CONE_COLOR = new THREE.Color('#10B981')
@@ -98,7 +98,6 @@ function computeStationCones(
 
 function ConeGeometry({ data }: { data: StationConeData }) {
   const meshRef = useRef<THREE.Mesh>(null)
-  const { positionRef } = useSatellitePosition()
 
   const geometry = useMemo(() => {
     const geo = new THREE.BufferGeometry()
@@ -123,7 +122,7 @@ function ConeGeometry({ data }: { data: StationConeData }) {
   useFrame(() => {
     if (!meshRef.current) return
     _stationUp.copy(data.up)
-    _satDir.copy(positionRef.current).normalize()
+    _satDir.copy(sharedSatellitePosition).normalize()
     const angularDist = Math.acos(Math.min(1, Math.max(-1, _stationUp.dot(_satDir))))
     const isActive = angularDist < data.lambda
     material.opacity = isActive ? CONE_OPACITY_ACTIVE : CONE_OPACITY_DEFAULT
@@ -134,7 +133,6 @@ function ConeGeometry({ data }: { data: StationConeData }) {
 
 function CommLinkLines({ cones }: { cones: StationConeData[] }) {
   const lineRef = useRef<THREE.LineSegments>(null)
-  const { positionRef } = useSatellitePosition()
 
   // Pre-allocate buffer for all possible station links
   const { geometry, maxPairs } = useMemo(() => {
@@ -165,7 +163,7 @@ function CommLinkLines({ cones }: { cones: StationConeData[] }) {
     for (let i = 0; i < cones.length; i++) {
       const cone = cones[i]
       _stationUp.copy(cone.up)
-      _satDir.copy(positionRef.current).normalize()
+      _satDir.copy(sharedSatellitePosition).normalize()
       const angularDist = Math.acos(Math.min(1, Math.max(-1, _stationUp.dot(_satDir))))
 
       if (angularDist < cone.lambda) {
@@ -175,9 +173,9 @@ function CommLinkLines({ cones }: { cones: StationConeData[] }) {
         arr[offset + 1] = cone.pos.y
         arr[offset + 2] = cone.pos.z
         // Satellite position
-        arr[offset + 3] = positionRef.current.x
-        arr[offset + 4] = positionRef.current.y
-        arr[offset + 5] = positionRef.current.z
+        arr[offset + 3] = sharedSatellitePosition.x
+        arr[offset + 4] = sharedSatellitePosition.y
+        arr[offset + 5] = sharedSatellitePosition.z
         activeCount++
       }
     }

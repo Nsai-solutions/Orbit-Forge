@@ -1,8 +1,6 @@
 import { Suspense, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { OrbitControls } from '@react-three/drei'
-// Bloom disabled for performance — can re-enable later
-// import { EffectComposer, Bloom } from '@react-three/postprocessing'
 import type { OrbitControls as OrbitControlsType } from 'three-stdlib'
 import Earth from './Earth'
 import Atmosphere from './Atmosphere'
@@ -14,7 +12,6 @@ import ApsisMarkers from './ApsisMarkers'
 import GroundTrack from './GroundTrack'
 import CoordinateGrid from './CoordinateGrid'
 import GroundStationMarkers from './GroundStationMarker'
-import { SatellitePositionProvider } from './SatellitePositionContext'
 import StationVisibilityCones from './StationVisibilityCone'
 import PayloadFootprint from './PayloadFootprint'
 
@@ -69,16 +66,14 @@ export default function EarthScene() {
       <GroundTrack />
       <GroundStationMarkers />
 
-      <SatellitePositionProvider>
-        {/* Orbit visualization */}
-        <OrbitLine />
-        <SatelliteMarker />
-        <ApsisMarkers />
+      {/* Orbit visualization — direct siblings, no wrapper */}
+      <OrbitLine />
+      <SatelliteMarker />
+      <ApsisMarkers />
 
-        {/* Visibility & footprint overlays — read their own toggle state */}
-        <StationVisibilityCones />
-        <PayloadFootprint />
-      </SatellitePositionProvider>
+      {/* Visibility & footprint overlays — read their own toggle state */}
+      <StationVisibilityCones />
+      <PayloadFootprint />
 
       <AdaptiveControls />
     </>
