@@ -25,10 +25,6 @@ build/
 .DS_Store
 Thumbs.db
 
-# Textures (download separately)
-frontend/public/textures/*.jpg
-frontend/public/textures/*.png
-!frontend/public/textures/README.md
 
 # Logs
 *.log
