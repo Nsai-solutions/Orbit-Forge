@@ -5,12 +5,12 @@ import { computeGroundTrack } from '@/lib/orbital-mechanics'
 
 export default function GroundTrackPlot() {
   const elements = useStore((s) => s.elements)
+  const orbitEpoch = useStore((s) => s.orbitEpoch)
   const groundStations = useStore((s) => s.groundStations)
   const activeStations = groundStations.filter((gs) => gs.active)
 
   const traces = useMemo(() => {
-    const epoch = new Date()
-    const track = computeGroundTrack(elements, epoch, 3, 180)
+    const track = computeGroundTrack(elements, orbitEpoch, 15, 180)
 
     // Split into segments at antimeridian
     const segments: Array<{ lats: number[]; lons: number[] }> = []
@@ -54,7 +54,7 @@ export default function GroundTrackPlot() {
     }
 
     return result
-  }, [elements, activeStations])
+  }, [elements, activeStations, orbitEpoch])
 
   // Dynamic satellite marker driven by 3D animation
   const satSubPoint = useStore((s) => s.satSubPoint)

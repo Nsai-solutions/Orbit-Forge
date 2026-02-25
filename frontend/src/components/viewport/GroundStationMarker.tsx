@@ -40,12 +40,12 @@ export default function GroundStationMarkers() {
           {/* Label — occlude hides it when behind the Earth */}
           <Html
             center
-            occlude
+            occlude="blending"
             style={{ pointerEvents: 'none', userSelect: 'none' }}
-            distanceFactor={6}
+            distanceFactor={15}
             position={[0, 0.03, 0]}
           >
-            <div className="whitespace-nowrap bg-space-800/90 border border-accent-green/30 rounded px-1.5 py-0.5 text-[9px] font-mono text-accent-green leading-tight">
+            <div className="whitespace-nowrap max-w-[120px] truncate bg-space-800/90 border border-accent-green/30 rounded px-1.5 py-0.5 text-[9px] font-mono text-accent-green leading-tight">
               {station.name}
             </div>
           </Html>

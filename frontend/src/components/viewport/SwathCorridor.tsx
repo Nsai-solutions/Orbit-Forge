@@ -42,13 +42,13 @@ function useSwathWidthKm(): number | null {
 export default function SwathCorridor() {
   const showSwath = useStore((s) => s.overlayToggles.swathCorridor)
   const elements = useStore((s) => s.elements)
+  const orbitEpoch = useStore((s) => s.orbitEpoch)
   const swathWidthKm = useSwathWidthKm()
 
   const ribbonGeometry = useMemo(() => {
     if (!swathWidthKm || swathWidthKm <= 0) return null
 
-    const epoch = new Date()
-    const track = computeGroundTrack(elements, epoch, 1, 360)
+    const track = computeGroundTrack(elements, orbitEpoch, 3, 360)
     if (track.length < 2) return null
 
     // Half-swath angular offset on the unit sphere (radians)
@@ -131,7 +131,7 @@ export default function SwathCorridor() {
     geo.setIndex(indices)
     geo.computeVertexNormals()
     return geo
-  }, [elements, swathWidthKm])
+  }, [elements, swathWidthKm, orbitEpoch])
 
   if (!showSwath || !ribbonGeometry) return null
 

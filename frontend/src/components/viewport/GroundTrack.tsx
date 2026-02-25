@@ -6,10 +6,10 @@ import { geodeticToThreeJS } from '@/lib/coordinate-transforms'
 
 export default function GroundTrack() {
   const elements = useStore((s) => s.elements)
+  const orbitEpoch = useStore((s) => s.orbitEpoch)
 
   const segments = useMemo(() => {
-    const epoch = new Date()
-    const track = computeGroundTrack(elements, epoch, 3, 180)
+    const track = computeGroundTrack(elements, orbitEpoch, 3, 180)
 
     // Break track into segments at antimeridian crossings
     const segs: Array<[number, number, number][]> = []
@@ -35,7 +35,7 @@ export default function GroundTrack() {
     if (currentSeg.length >= 2) segs.push(currentSeg)
 
     return segs
-  }, [elements])
+  }, [elements, orbitEpoch])
 
   if (segments.length === 0) return null
 
