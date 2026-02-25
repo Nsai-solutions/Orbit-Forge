@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useStore } from '@/stores'
 import { ModuleId } from '@/types'
 import LandingPage from '@/pages/LandingPage'
+import ValidationPage from '@/pages/ValidationPage'
 import TopBar from '@/components/layout/TopBar'
 import LeftPanel from '@/components/layout/LeftPanel'
 import RightPanel from '@/components/layout/RightPanel'
@@ -140,18 +141,32 @@ function BottomPanelContent() {
 }
 
 export default function App() {
-  const [view, setView] = useState<'landing' | 'app'>(() =>
-    window.location.hash === '#app' ? 'app' : 'landing'
-  )
+  const [view, setView] = useState<'landing' | 'app' | 'validation'>(() => {
+    const hash = window.location.hash
+    if (hash === '#app') return 'app'
+    if (hash === '#validation') return 'validation'
+    return 'landing'
+  })
   const [saveDialogOpen, setSaveDialogOpen] = useState(false)
   const activeModule = useStore((s) => s.activeModule)
 
   useEffect(() => {
-    const onHash = () =>
-      setView(window.location.hash === '#app' ? 'app' : 'landing')
+    const onHash = () => {
+      const hash = window.location.hash
+      if (hash === '#app') setView('app')
+      else if (hash === '#validation') setView('validation')
+      else setView('landing')
+    }
     window.addEventListener('hashchange', onHash)
     return () => window.removeEventListener('hashchange', onHash)
   }, [])
+
+  if (view === 'validation') return (
+    <>
+      <MobileOverlay />
+      <ValidationPage />
+    </>
+  )
 
   if (view === 'landing') return (
     <>

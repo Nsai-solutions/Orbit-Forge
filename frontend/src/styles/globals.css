@@ -60,8 +60,9 @@ html, body, #root {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Landing page needs scrolling */
-#root:has(.landing-page) {
+/* Landing page and validation page need scrolling */
+#root:has(.landing-page),
+#root:has(.validation-page) {
   overflow: auto;
 }
 

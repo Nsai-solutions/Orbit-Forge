@@ -89,26 +89,41 @@ export default function LandingPage() {
           >
             North Star AI Solutions
           </span>
-          <button
-            onClick={enterApp}
-            className="px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200"
-            style={{
-              background: 'rgba(59, 130, 246, 0.15)',
-              color: '#3B82F6',
-              border: '1px solid rgba(59, 130, 246, 0.3)',
-              backdropFilter: 'blur(8px)',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = 'rgba(59, 130, 246, 0.25)'
-              e.currentTarget.style.borderColor = 'rgba(59, 130, 246, 0.5)'
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = 'rgba(59, 130, 246, 0.15)'
-              e.currentTarget.style.borderColor = 'rgba(59, 130, 246, 0.3)'
-            }}
-          >
-            Open App
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            <a
+              href="#validation"
+              className="text-sm transition-all duration-200"
+              style={{
+                color: '#6B7280',
+                textDecoration: 'none',
+                fontFamily: "'IBM Plex Sans', sans-serif",
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.color = '#10B981')}
+              onMouseLeave={(e) => (e.currentTarget.style.color = '#6B7280')}
+            >
+              Validated against NASA/ESA data &rarr;
+            </a>
+            <button
+              onClick={enterApp}
+              className="px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-200"
+              style={{
+                background: 'rgba(59, 130, 246, 0.15)',
+                color: '#3B82F6',
+                border: '1px solid rgba(59, 130, 246, 0.3)',
+                backdropFilter: 'blur(8px)',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = 'rgba(59, 130, 246, 0.25)'
+                e.currentTarget.style.borderColor = 'rgba(59, 130, 246, 0.5)'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'rgba(59, 130, 246, 0.15)'
+                e.currentTarget.style.borderColor = 'rgba(59, 130, 246, 0.3)'
+              }}
+            >
+              Open App
+            </button>
+          </div>
         </div>
 
         {/* Hero content */}
