@@ -42,9 +42,9 @@ export default function ApsisMarkers() {
           center
           occlude
           style={{ pointerEvents: 'none', userSelect: 'none' }}
-          distanceFactor={5}
+          distanceFactor={15}
         >
-          <div className="whitespace-nowrap bg-space-800/90 border border-accent-green/30 rounded px-2 py-0.5 text-[10px] font-mono text-accent-green">
+          <div className="whitespace-nowrap bg-space-800/90 border border-accent-green/30 rounded px-1 py-0.5 text-[8px] font-mono text-accent-green">
             Pe {markers.perigeeAlt.toFixed(0)} km
           </div>
         </Html>
@@ -60,9 +60,9 @@ export default function ApsisMarkers() {
           center
           occlude
           style={{ pointerEvents: 'none', userSelect: 'none' }}
-          distanceFactor={5}
+          distanceFactor={15}
         >
-          <div className="whitespace-nowrap bg-space-800/90 border border-accent-amber/30 rounded px-2 py-0.5 text-[10px] font-mono text-accent-amber">
+          <div className="whitespace-nowrap bg-space-800/90 border border-accent-amber/30 rounded px-1 py-0.5 text-[8px] font-mono text-accent-amber">
             Ap {markers.apogeeAlt.toFixed(0)} km
           </div>
         </Html>

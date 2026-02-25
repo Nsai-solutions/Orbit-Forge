@@ -10,7 +10,7 @@ export default function GroundTrack() {
 
   const segments = useMemo(() => {
     console.log('[GroundTrack] orbitEpoch:', orbitEpoch.toISOString(), 'ref:', orbitEpoch)
-    const track = computeGroundTrack(elements, orbitEpoch, 3, 180, true)
+    const track = computeGroundTrack(elements, orbitEpoch, 3, 180, false)
 
     // Break track into segments at antimeridian crossings
     const segs: Array<[number, number, number][]> = []
