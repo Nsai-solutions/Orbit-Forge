@@ -1,7 +1,7 @@
-import { useRef, useMemo, useState } from 'react'
-import { useFrame, useLoader } from '@react-three/fiber'
+import { useRef, useMemo } from 'react'
+import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
-import { shaderMaterial } from '@react-three/drei'
+import { shaderMaterial, useTexture } from '@react-three/drei'
 import { extend } from '@react-three/fiber'
 
 // Day/Night blending shader
@@ -82,66 +82,34 @@ declare global {
   }
 }
 
-// Procedural fallback if textures aren't available
-function createProceduralTexture(color: string, size = 64): THREE.Texture {
-  const canvas = document.createElement('canvas')
-  canvas.width = size
-  canvas.height = size
-  const ctx = canvas.getContext('2d')!
-  ctx.fillStyle = color
-  ctx.fillRect(0, 0, size, size)
-  const tex = new THREE.CanvasTexture(canvas)
-  tex.needsUpdate = true
-  return tex
-}
-
 export default function Earth() {
   const earthRef = useRef<THREE.Mesh>(null)
   const cloudsRef = useRef<THREE.Mesh>(null)
-  const [texturesLoaded, setTexturesLoaded] = useState(false)
 
-  // Try loading textures, fall back to procedural
+  // useTexture suspends until all textures are fully loaded (integrates with Suspense)
+  const textureMap = useTexture({
+    day: '/textures/earth_daymap_2k.jpg',
+    night: '/textures/earth_nightmap_2k.jpg',
+    clouds: '/textures/earth_clouds_2k.jpg',
+    normal: '/textures/earth_normal_2k.jpg',
+    specular: '/textures/earth_specular_2k.jpg',
+  })
+
+  // Set correct color space per texture type
   const textures = useMemo(() => {
-    const loader = new THREE.TextureLoader()
-    const fallback = {
-      day: createProceduralTexture('#1a4d8f', 256),
-      night: createProceduralTexture('#020408', 256),
-      clouds: createProceduralTexture('#ffffff', 64),
-      normal: createProceduralTexture('#8080ff', 64),
-      specular: createProceduralTexture('#333333', 64),
+    // Color textures: sRGB (Three.js converts to linear when sampled in shader)
+    textureMap.day.colorSpace = THREE.SRGBColorSpace
+    textureMap.night.colorSpace = THREE.SRGBColorSpace
+    textureMap.clouds.colorSpace = THREE.SRGBColorSpace
+    // Non-color data textures: must stay linear
+    textureMap.normal.colorSpace = THREE.LinearSRGBColorSpace
+    textureMap.specular.colorSpace = THREE.LinearSRGBColorSpace
+
+    for (const tex of Object.values(textureMap)) {
+      ;(tex as THREE.Texture).anisotropy = 8
     }
-
-    const loaded: typeof fallback = { ...fallback }
-    let count = 0
-    const total = 5
-
-    const onLoad = () => {
-      count++
-      if (count === total) setTexturesLoaded(true)
-    }
-    const onError = () => {
-      count++
-      if (count === total) setTexturesLoaded(true)
-    }
-
-    try {
-      loaded.day = loader.load('/textures/earth_daymap_2k.jpg', onLoad, undefined, onError)
-      loaded.night = loader.load('/textures/earth_nightmap_2k.jpg', onLoad, undefined, onError)
-      loaded.clouds = loader.load('/textures/earth_clouds_2k.jpg', onLoad, undefined, onError)
-      loaded.normal = loader.load('/textures/earth_normal_2k.jpg', onLoad, undefined, onError)
-      loaded.specular = loader.load('/textures/earth_specular_2k.jpg', onLoad, undefined, onError)
-    } catch {
-      setTexturesLoaded(true)
-    }
-
-    // Set texture properties
-    Object.values(loaded).forEach((tex) => {
-      tex.colorSpace = THREE.SRGBColorSpace
-      tex.anisotropy = 8
-    })
-
-    return loaded
-  }, [])
+    return textureMap
+  }, [textureMap])
 
   // Compute sun direction from current date
   const sunDir = useMemo(() => {

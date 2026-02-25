@@ -16,6 +16,7 @@ export default function SatelliteMarker() {
 
   // Read elements once — re-reads on store change via selector
   const elements = useStore((s) => s.elements)
+  const orbitEpoch = useStore((s) => s.orbitEpoch)
   const setSatSubPoint = useStore((s) => s.setSatSubPoint)
 
   useFrame((_, delta) => {
@@ -25,9 +26,9 @@ export default function SatelliteMarker() {
     const speed = 0.02
     phaseRef.current = (phaseRef.current + speed * delta) % 1
 
-    // Compute position directly without triggering React re-render
+    // Compute position using the same epoch as the orbit ring (prevents GMST drift)
     const trueAnomaly = phaseRef.current * 360
-    const pos = getSatellitePosition({ ...elements, trueAnomaly })
+    const pos = getSatellitePosition({ ...elements, trueAnomaly }, orbitEpoch)
     groupRef.current.position.set(pos.x, pos.y, pos.z)
 
     // Write to shared module-level refs for overlay components
@@ -38,8 +39,7 @@ export default function SatelliteMarker() {
     subPointTimer.current += delta
     if (subPointTimer.current > 0.2) {
       subPointTimer.current = 0
-      const now = new Date()
-      const gmst = dateToGMST(now)
+      const gmst = dateToGMST(orbitEpoch)
       const { position: eciPos } = keplerianToCartesian({ ...elements, trueAnomaly }, MU_EARTH_KM)
       const ecef = eciToEcef(eciPos, gmst)
       const geo = ecefToGeodetic(ecef)

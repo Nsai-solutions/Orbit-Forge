@@ -8,6 +8,7 @@ export interface OrbitSlice {
   elements: OrbitalElements
   derivedParams: DerivedOrbitalParams | null
   orbitPositions: Vec3[]
+  orbitEpoch: Date
   updateElements: (partial: Partial<OrbitalElements>) => void
   setFromPreset: (presetKey: string) => void
   recompute: () => void
@@ -16,9 +17,10 @@ export interface OrbitSlice {
 const DEFAULT_ELEMENTS = ORBIT_PRESETS.iss.elements
 
 function computeAll(elements: OrbitalElements) {
-  const orbitPositions = propagateOrbitPositions(elements, 180)
+  const orbitEpoch = new Date()
+  const orbitPositions = propagateOrbitPositions(elements, 180, orbitEpoch)
   const derivedParams = computeDerivedParams(elements)
-  return { orbitPositions, derivedParams }
+  return { orbitPositions, derivedParams, orbitEpoch }
 }
 
 export const createOrbitSlice: StateCreator<OrbitSlice, [], [], OrbitSlice> = (set, get) => {
@@ -28,6 +30,7 @@ export const createOrbitSlice: StateCreator<OrbitSlice, [], [], OrbitSlice> = (s
     elements: DEFAULT_ELEMENTS,
     derivedParams: initial.derivedParams,
     orbitPositions: initial.orbitPositions,
+    orbitEpoch: initial.orbitEpoch,
 
     updateElements: (partial) => {
       const elements = { ...get().elements, ...partial }

@@ -14,6 +14,7 @@ import CoordinateGrid from './CoordinateGrid'
 import GroundStationMarkers from './GroundStationMarker'
 import StationVisibilityCones from './StationVisibilityCone'
 import PayloadFootprint from './PayloadFootprint'
+import SwathCorridor from './SwathCorridor'
 
 function AdaptiveControls() {
   const controlsRef = useRef<OrbitControlsType>(null)
@@ -74,6 +75,7 @@ export default function EarthScene() {
       {/* Visibility & footprint overlays — read their own toggle state */}
       <StationVisibilityCones />
       <PayloadFootprint />
+      <SwathCorridor />
 
       <AdaptiveControls />
     </>

@@ -42,10 +42,10 @@ export default function GroundStationMarkers() {
             center
             occlude
             style={{ pointerEvents: 'none', userSelect: 'none' }}
-            distanceFactor={5}
+            distanceFactor={6}
             position={[0, 0.03, 0]}
           >
-            <div className="whitespace-nowrap bg-space-800/90 border border-accent-green/30 rounded px-1 py-0.5 text-[8px] font-mono text-accent-green leading-tight">
+            <div className="whitespace-nowrap bg-space-800/90 border border-accent-green/30 rounded px-1.5 py-0.5 text-[9px] font-mono text-accent-green leading-tight">
               {station.name}
             </div>
           </Html>
