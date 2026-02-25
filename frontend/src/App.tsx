@@ -161,19 +161,9 @@ export default function App() {
     return () => window.removeEventListener('hashchange', onHash)
   }, [])
 
-  if (view === 'validation') return (
-    <>
-      <MobileOverlay />
-      <ValidationPage />
-    </>
-  )
+  if (view === 'validation') return <ValidationPage />
 
-  if (view === 'landing') return (
-    <>
-      <MobileOverlay />
-      <LandingPage />
-    </>
-  )
+  if (view === 'landing') return <LandingPage />
 
   return (
     <div className="w-full h-screen flex flex-col bg-space-900 overflow-hidden">

@@ -162,3 +162,13 @@ input[type="number"] {
 .loading-glow {
   animation: loading-glow 1.5s ease-in-out infinite;
 }
+
+/* Mobile: show desktop notes, hide scroll indicator */
+@media (max-width: 1023px) {
+  .mobile-only-note {
+    display: flex !important;
+  }
+  .scroll-indicator {
+    display: none !important;
+  }
+}

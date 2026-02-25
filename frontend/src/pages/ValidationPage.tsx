@@ -715,6 +715,29 @@ export default function ValidationPage() {
           typically use gravity assists to significantly reduce energy requirements. Last updated:
           February 2026.
         </div>
+
+        {/* Mobile-only desktop CTA */}
+        <div
+          className="mobile-only-note"
+          style={{
+            display: 'none',
+            alignItems: 'center',
+            gap: '10px',
+            marginTop: '24px',
+            padding: '14px 20px',
+            background: 'rgba(59, 130, 246, 0.06)',
+            border: '1px solid rgba(59, 130, 246, 0.15)',
+            borderRadius: '10px',
+          }}
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#3B82F6" strokeWidth="1.5" style={{ flexShrink: 0 }}>
+            <rect x="2" y="3" width="20" height="14" rx="2" />
+            <path d="M8 21h8M12 17v4" />
+          </svg>
+          <span style={{ fontSize: '13px', color: '#9CA3AF', lineHeight: 1.5 }}>
+            Want to try these calculations yourself? Open OrbitForge on a desktop browser to access the full mission planning toolkit.
+          </span>
+        </div>
       </main>
 
       {/* Footer */}
