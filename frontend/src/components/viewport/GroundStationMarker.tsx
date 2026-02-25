@@ -40,7 +40,7 @@ export default function GroundStationMarkers() {
           {/* Label — occlude hides it when behind the Earth */}
           <Html
             center
-            occlude="blending"
+            occlude
             style={{ pointerEvents: 'none', userSelect: 'none' }}
             distanceFactor={15}
             position={[0, 0.03, 0]}

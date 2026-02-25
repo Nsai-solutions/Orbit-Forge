@@ -48,7 +48,7 @@ export default function SwathCorridor() {
   const ribbonGeometry = useMemo(() => {
     if (!swathWidthKm || swathWidthKm <= 0) return null
 
-    const track = computeGroundTrack(elements, orbitEpoch, 3, 360)
+    const track = computeGroundTrack(elements, orbitEpoch, 3, 360, true)
     if (track.length < 2) return null
 
     // Half-swath angular offset on the unit sphere (radians)

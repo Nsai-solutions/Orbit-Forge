@@ -10,7 +10,7 @@ export default function GroundTrackPlot() {
   const activeStations = groundStations.filter((gs) => gs.active)
 
   const traces = useMemo(() => {
-    const track = computeGroundTrack(elements, orbitEpoch, 15, 180)
+    const track = computeGroundTrack(elements, orbitEpoch, 10, 180)
 
     // Split into segments at antimeridian
     const segments: Array<{ lats: number[]; lons: number[] }> = []

@@ -19,6 +19,13 @@ export default function SatelliteMarker() {
   const orbitEpoch = useStore((s) => s.orbitEpoch)
   const setSatSubPoint = useStore((s) => s.setSatSubPoint)
 
+  // Diagnostic: log epoch once per epoch change
+  const loggedEpochRef = useRef<Date | null>(null)
+  if (loggedEpochRef.current !== orbitEpoch) {
+    console.log('[SatelliteMarker] orbitEpoch:', orbitEpoch.toISOString(), 'ref:', orbitEpoch)
+    loggedEpochRef.current = orbitEpoch
+  }
+
   useFrame((_, delta) => {
     if (!groupRef.current) return
 

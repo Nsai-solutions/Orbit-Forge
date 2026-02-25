@@ -195,12 +195,19 @@ export function getSatellitePosition(elements: OrbitalElements, epoch: Date = ne
 /**
  * Compute ground track for multiple orbits
  * Returns array of {lat, lon} in degrees
+ *
+ * When useFixedGMST is true, a single GMST (at epoch) is used for all points.
+ * This matches the orbit ring's rendering (frozen Earth rotation) and ensures
+ * the 3D ground track aligns perfectly with the orbit ring and satellite marker.
+ * Use useFixedGMST=false (default) for the 2D Mercator map where evolving GMST
+ * produces the correct sinusoidal ground trace pattern.
  */
 export function computeGroundTrack(
   elements: OrbitalElements,
   epoch: Date,
   numRevolutions = 1,
-  pointsPerRev = 360
+  pointsPerRev = 360,
+  useFixedGMST = false
 ): Array<{ lat: number; lon: number }> {
   const period = computeOrbitalPeriod(elements.semiMajorAxis)
   const totalPoints = numRevolutions * pointsPerRev
@@ -222,6 +229,9 @@ export function computeGroundTrack(
   const nu0 = elements.trueAnomaly * DEG2RAD
   const E0 = trueToEccentricAnomaly(nu0, elements.eccentricity)
   const M0 = E0 - elements.eccentricity * Math.sin(E0)
+
+  // When useFixedGMST is true, compute GMST once (matches orbit ring rendering)
+  const fixedGmst = useFixedGMST ? dateToGMST(epoch) : 0
 
   for (let i = 0; i <= totalPoints; i++) {
     const dt = (i / pointsPerRev) * period // seconds since epoch
@@ -246,9 +256,10 @@ export function computeGroundTrack(
     // Get ECI position
     const { position } = keplerianToCartesian(currentElements, MU_EARTH_KM)
 
-    // Convert to ECEF using GMST at this time
-    const currentDate = new Date(epoch.getTime() + dt * 1000)
-    const gmst = dateToGMST(currentDate)
+    // Convert to ECEF: fixed GMST for 3D alignment, evolving GMST for 2D map
+    const gmst = useFixedGMST
+      ? fixedGmst
+      : dateToGMST(new Date(epoch.getTime() + dt * 1000))
     const ecef = eciToEcef(position, gmst)
 
     // Convert to geodetic
