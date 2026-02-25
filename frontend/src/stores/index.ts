@@ -12,8 +12,9 @@ import { ComparisonSlice, createComparisonSlice } from './comparison-slice'
 import { PayloadSlice, createPayloadSlice } from './payload-slice'
 import { BeyondLeoSlice, createBeyondLeoSlice } from './beyond-leo-slice'
 import { ArchitectSlice, createArchitectSlice } from './architect-slice'
+import { SimulationSlice, createSimulationSlice } from './simulation-slice'
 
-export type AppStore = UISlice & MissionSlice & OrbitSlice & GroundSlice & PowerSlice & ConstellationSlice & DeltaVSlice & RadiationSlice & ComparisonSlice & PayloadSlice & BeyondLeoSlice & ArchitectSlice
+export type AppStore = UISlice & MissionSlice & OrbitSlice & GroundSlice & PowerSlice & ConstellationSlice & DeltaVSlice & RadiationSlice & ComparisonSlice & PayloadSlice & BeyondLeoSlice & ArchitectSlice & SimulationSlice
 
 export const useStore = create<AppStore>()(
   devtools(
@@ -31,6 +32,7 @@ export const useStore = create<AppStore>()(
         ...createPayloadSlice(...a),
         ...createBeyondLeoSlice(...a),
         ...createArchitectSlice(...a),
+        ...createSimulationSlice(...a),
       }),
       {
         name: 'orbitforge-autosave',

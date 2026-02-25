@@ -15,6 +15,7 @@ import GroundStationMarkers from './GroundStationMarker'
 import StationVisibilityCones from './StationVisibilityCone'
 import PayloadFootprint from './PayloadFootprint'
 import SwathCorridor from './SwathCorridor'
+import SimulationClock from './SimulationClock'
 
 function AdaptiveControls() {
   const controlsRef = useRef<OrbitControlsType>(null)
@@ -54,6 +55,7 @@ function AdaptiveControls() {
 export default function EarthScene() {
   return (
     <>
+      <SimulationClock />
       <SunLight />
 
       <Suspense fallback={null}>

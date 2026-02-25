@@ -8,9 +8,13 @@ import { dateToGMST } from '@/lib/time-utils'
 export default function ApsisMarkers() {
   const elements = useStore((s) => s.elements)
   const orbitEpoch = useStore((s) => s.orbitEpoch)
+  const simTime = useStore((s) => s.simTime)
+  const effectiveTime = simTime || orbitEpoch.getTime()
+  // Round to 500ms to throttle re-renders (~2/sec max)
+  const roundedTime = Math.round(effectiveTime / 500) * 500
 
   const markers = useMemo(() => {
-    const gmst = dateToGMST(orbitEpoch)
+    const gmst = dateToGMST(new Date(roundedTime))
 
     // Perigee is at true anomaly = 0
     const perigeeElements = { ...elements, trueAnomaly: 0 }
@@ -25,7 +29,7 @@ export default function ApsisMarkers() {
     const apogeeAlt = elements.semiMajorAxis * (1 + elements.eccentricity) - R_EARTH_EQUATORIAL
 
     return { perigee, apogee, perigeeAlt, apogeeAlt }
-  }, [elements, orbitEpoch])
+  }, [elements, roundedTime])
 
   // Only show if orbit has meaningful eccentricity
   if (elements.eccentricity < 0.005) return null

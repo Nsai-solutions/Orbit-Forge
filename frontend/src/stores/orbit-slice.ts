@@ -12,6 +12,7 @@ export interface OrbitSlice {
   updateElements: (partial: Partial<OrbitalElements>) => void
   setFromPreset: (presetKey: string) => void
   recompute: () => void
+  setOrbitPositionsForSim: (positions: Vec3[]) => void
 }
 
 const DEFAULT_ELEMENTS = ORBIT_PRESETS.iss.elements
@@ -57,5 +58,7 @@ export const createOrbitSlice: StateCreator<OrbitSlice, [], [], OrbitSlice> = (s
       const computed = computeAll(elements)
       set(computed)
     },
+
+    setOrbitPositionsForSim: (positions) => set({ orbitPositions: positions }),
   }
 }

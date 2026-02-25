@@ -6,6 +6,7 @@ import { ModuleId } from '@/types'
 import EarthScene from '@/components/viewport/EarthScene'
 import BeyondLeoScene from '@/components/viewport/BeyondLeoScene'
 import OverlayTogglePanel from '@/components/viewport/OverlayTogglePanel'
+import TimeControls from '@/components/viewport/TimeControls'
 
 function LoadingFallback() {
   return (
@@ -38,6 +39,16 @@ function ShowOverlayPanel() {
   return <OverlayTogglePanel />
 }
 
+function ShowTimeControls() {
+  const activeModule = useStore((s) => s.activeModule)
+  const showControls =
+    activeModule === ModuleId.OrbitDesign ||
+    activeModule === ModuleId.GroundPasses ||
+    activeModule === ModuleId.Payload
+  if (!showControls) return null
+  return <TimeControls />
+}
+
 export default function CenterViewport() {
   return (
     <div className="relative flex-1 bg-space-900 overflow-hidden">
@@ -59,6 +70,7 @@ export default function CenterViewport() {
         </Canvas>
       </Suspense>
       <ShowOverlayPanel />
+      <ShowTimeControls />
     </div>
   )
 }
