@@ -89,14 +89,14 @@ export default function LunarScene() {
   // ─── Flyby: phased trajectory ───
   const flybyPhases = useMemo<PhasedTrajectory | null>(() => {
     if (params.missionType !== 'flyby') return null
-    return generateFlybyPath(params.departureAltKm)
-  }, [params.departureAltKm, params.missionType])
+    return generateFlybyPath(params.departureAltKm, params.closestApproachAltKm)
+  }, [params.departureAltKm, params.missionType, params.closestApproachAltKm])
 
   // ─── Free-return: phased trajectory ───
   const freeReturnPhases = useMemo<PhasedTrajectory | null>(() => {
     if (params.missionType !== 'free-return') return null
-    return generateFreeReturnTrajectory(params.departureAltKm)
-  }, [params.departureAltKm, params.missionType])
+    return generateFreeReturnTrajectory(params.departureAltKm, params.closestApproachAltKm)
+  }, [params.departureAltKm, params.missionType, params.closestApproachAltKm])
 
   // ─── Lunar orbit ring — orbit insertion & landing ───
   // Uses visual scale so the ring is clearly visible outside the Moon sphere

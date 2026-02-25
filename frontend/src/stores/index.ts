@@ -36,7 +36,7 @@ export const useStore = create<AppStore>()(
       }),
       {
         name: 'orbitforge-autosave',
-        version: 14,
+        version: 15,
         migrate: (persisted: any, version: number) => {
           if (version < 8) {
             const { groundStations, ...rest } = persisted || {}
@@ -67,6 +67,18 @@ export const useStore = create<AppStore>()(
             if (persisted) {
               const { groundStations: _gs, ...rest } = persisted
               persisted = rest
+            }
+          }
+          // v15: Add closestApproachAltKm to lunar params
+          if (version < 15) {
+            if (persisted?.beyondLeo?.lunarParams && persisted.beyondLeo.lunarParams.closestApproachAltKm == null) {
+              persisted = {
+                ...persisted,
+                beyondLeo: {
+                  ...persisted.beyondLeo,
+                  lunarParams: { ...persisted.beyondLeo.lunarParams, closestApproachAltKm: 250 },
+                },
+              }
             }
           }
           return persisted as any

@@ -527,9 +527,9 @@ export function generateFlybyPath(
  */
 export function generateFreeReturnTrajectory(
   departureAltKm: number,
+  closestApproachKm = 250,
   numPoints = 160,
 ): PhasedTrajectory {
-  const closestApproachKm = 250
   const { sma, e, p } = computeTransferElements(departureAltKm)
   const hyp = computeHyperbolicEncounter(sma, closestApproachKm)
   const omegaRot = Math.PI

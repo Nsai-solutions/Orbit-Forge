@@ -81,7 +81,7 @@ export default function OrbitInputPanel() {
             max={180}
             step={0.1}
             unit="\u00B0"
-            precision={1}
+            precision={2}
             onChange={(v) => updateElements({ inclination: v })}
           />
           <div className="flex flex-wrap gap-1">
@@ -104,7 +104,7 @@ export default function OrbitInputPanel() {
           max={360}
           step={0.5}
           unit="\u00B0"
-          precision={1}
+          precision={2}
           onChange={(v) => updateElements({ raan: v })}
         />
 
@@ -115,7 +115,7 @@ export default function OrbitInputPanel() {
           max={360}
           step={0.5}
           unit="\u00B0"
-          precision={1}
+          precision={2}
           onChange={(v) => updateElements({ argOfPerigee: v })}
         />
 
@@ -126,7 +126,7 @@ export default function OrbitInputPanel() {
           max={360}
           step={1}
           unit="\u00B0"
-          precision={0}
+          precision={1}
           onChange={(v) => updateElements({ trueAnomaly: v })}
         />
       </SectionHeader>

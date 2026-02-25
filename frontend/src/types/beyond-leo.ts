@@ -49,6 +49,7 @@ export interface LunarParams {
   spacecraftMassKg: number
   ispS: number
   propellantMassKg: number
+  closestApproachAltKm: number
 }
 
 export interface LunarResult {
@@ -140,6 +141,7 @@ export const DEFAULT_LUNAR_PARAMS: LunarParams = {
   spacecraftMassKg: 500,
   ispS: 450,
   propellantMassKg: 100,
+  closestApproachAltKm: 250,
 }
 
 /** Per-body default arrival orbit configs */

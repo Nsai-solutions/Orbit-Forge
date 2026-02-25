@@ -702,6 +702,7 @@ function executeAnalyzeLunarTransfer(input: Record<string, unknown>): Record<str
     spacecraftMassKg,
     ispS,
     propellantMassKg: 0,
+    closestApproachAltKm: (input.closest_approach_km as number) || 250,
   })
 
   // Sync to Beyond-LEO store

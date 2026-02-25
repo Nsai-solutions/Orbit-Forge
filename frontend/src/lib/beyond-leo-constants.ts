@@ -77,6 +77,8 @@ export interface PlanetData {
   atmosphereType: 'none' | 'thin' | 'moderate' | 'thick'
   synodicPeriodDays: number
   meanLongitudeAtJ2000Deg: number // mean longitude at J2000 epoch (degrees)
+  eccentricity: number                  // orbital eccentricity
+  longitudeOfPerihelionDeg: number      // longitude of perihelion at J2000 (degrees)
   color: string                 // hex color for 3D rendering
 }
 
@@ -94,6 +96,8 @@ export const PLANET_DATA: Record<TargetBody, PlanetData> = {
     atmosphereType: 'none',
     synodicPeriodDays: 115.88,
     meanLongitudeAtJ2000Deg: 252.251,
+    eccentricity: 0.20563,
+    longitudeOfPerihelionDeg: 77.456,
     color: '#A0522D',
   },
   venus: {
@@ -109,6 +113,8 @@ export const PLANET_DATA: Record<TargetBody, PlanetData> = {
     atmosphereType: 'thick',
     synodicPeriodDays: 583.92,
     meanLongitudeAtJ2000Deg: 181.980,
+    eccentricity: 0.00677,
+    longitudeOfPerihelionDeg: 131.534,
     color: '#DEB887',
   },
   mars: {
@@ -124,6 +130,8 @@ export const PLANET_DATA: Record<TargetBody, PlanetData> = {
     atmosphereType: 'thin',
     synodicPeriodDays: 779.96,
     meanLongitudeAtJ2000Deg: 355.433,
+    eccentricity: 0.09340,
+    longitudeOfPerihelionDeg: 336.060,
     color: '#CD5C5C',
   },
   jupiter: {
@@ -139,6 +147,8 @@ export const PLANET_DATA: Record<TargetBody, PlanetData> = {
     atmosphereType: 'thick',
     synodicPeriodDays: 398.88,
     meanLongitudeAtJ2000Deg: 34.351,
+    eccentricity: 0.04839,
+    longitudeOfPerihelionDeg: 14.331,
     color: '#DAA06D',
   },
   saturn: {
@@ -154,6 +164,8 @@ export const PLANET_DATA: Record<TargetBody, PlanetData> = {
     atmosphereType: 'thick',
     synodicPeriodDays: 378.09,
     meanLongitudeAtJ2000Deg: 50.077,
+    eccentricity: 0.05415,
+    longitudeOfPerihelionDeg: 93.057,
     color: '#F4C542',
   },
   uranus: {
@@ -169,6 +181,8 @@ export const PLANET_DATA: Record<TargetBody, PlanetData> = {
     atmosphereType: 'thick',
     synodicPeriodDays: 369.66,
     meanLongitudeAtJ2000Deg: 314.055,
+    eccentricity: 0.04717,
+    longitudeOfPerihelionDeg: 173.005,
     color: '#87CEEB',
   },
   neptune: {
@@ -184,6 +198,8 @@ export const PLANET_DATA: Record<TargetBody, PlanetData> = {
     atmosphereType: 'thick',
     synodicPeriodDays: 367.49,
     meanLongitudeAtJ2000Deg: 304.349,
+    eccentricity: 0.00859,
+    longitudeOfPerihelionDeg: 48.124,
     color: '#4169E1',
   },
   ceres: {
@@ -199,6 +215,8 @@ export const PLANET_DATA: Record<TargetBody, PlanetData> = {
     atmosphereType: 'none',
     synodicPeriodDays: 466.62,
     meanLongitudeAtJ2000Deg: 231.3,
+    eccentricity: 0.0758,
+    longitudeOfPerihelionDeg: 73.6,
     color: '#808080',
   },
   vesta: {
@@ -214,6 +232,8 @@ export const PLANET_DATA: Record<TargetBody, PlanetData> = {
     atmosphereType: 'none',
     synodicPeriodDays: 577.26,
     meanLongitudeAtJ2000Deg: 275.4,
+    eccentricity: 0.0887,
+    longitudeOfPerihelionDeg: 150.7,
     color: '#A9A9A9',
   },
 }
@@ -226,4 +246,6 @@ export const EARTH_ORBITAL_DATA = {
   mu: 3.986004418e5, // km³/s²
   radiusKm: 6371.0,
   meanLongitudeAtJ2000Deg: 100.464,
+  eccentricity: 0.01671,
+  longitudeOfPerihelionDeg: 102.937,
 }

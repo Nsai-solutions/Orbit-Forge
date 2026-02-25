@@ -53,6 +53,27 @@ export default function LunarPanel() {
         </div>
       </SectionHeader>
 
+      {(params.missionType === 'free-return' || params.missionType === 'flyby') && (
+        <SectionHeader title="Closest Approach">
+          <div className="space-y-3">
+            <label className="flex items-center justify-between">
+              <span className="text-[10px] text-[var(--text-secondary)]">CA Altitude</span>
+              <div className="flex items-center gap-1.5">
+                <input
+                  type="number"
+                  value={params.closestApproachAltKm}
+                  onChange={(e) => update({ closestApproachAltKm: parseFloat(e.target.value) || 0 })}
+                  className="input-field w-24 text-sm font-mono"
+                  min="50"
+                  max="5000"
+                />
+                <span className="text-[11px] text-[var(--text-secondary)] font-mono w-6">km</span>
+              </div>
+            </label>
+          </div>
+        </SectionHeader>
+      )}
+
       {showOrbitParams && (
         <SectionHeader title="Target Orbit">
           <div className="space-y-3">

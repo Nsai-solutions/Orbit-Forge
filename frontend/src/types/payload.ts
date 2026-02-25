@@ -147,6 +147,7 @@ export interface PayloadPreset {
   label: string
   shared: Partial<SharedPayloadConfig>
   config: Partial<EOConfig> | Partial<SARConfig> | Partial<SATCOMConfig>
+  orbit?: { altitudeKm: number; inclinationDeg: number }
 }
 
 export const EO_PRESETS: PayloadPreset[] = [
@@ -164,6 +165,12 @@ export const EO_PRESETS: PayloadPreset[] = [
     label: 'SkySat-like',
     shared: { name: 'SkySat Imager', mass: 20, powerPeak: 60, powerAvg: 35, dutyCycle: 0.35, dataRate: 350, storageCapacity: 256 },
     config: { focalLength: 3600, apertureDia: 350, pixelSize: 6.5, detectorWidth: 2048, detectorHeight: 1, spectralBands: 4, quantBits: 11, maxOffNadir: 25 } as Partial<EOConfig>,
+  },
+  {
+    label: 'Sentinel-2-like',
+    shared: { name: 'Sentinel-2 MSI', mass: 290, powerPeak: 266, powerAvg: 170, dutyCycle: 0.25, dataRate: 490, storageCapacity: 2400 },
+    config: { focalLength: 600, apertureDia: 150, pixelSize: 7.6, detectorWidth: 29116, detectorHeight: 1, spectralBands: 13, quantBits: 12, maxOffNadir: 20 } as Partial<EOConfig>,
+    orbit: { altitudeKm: 786, inclinationDeg: 98.6 },
   },
 ]
 

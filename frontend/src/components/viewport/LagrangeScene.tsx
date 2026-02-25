@@ -51,6 +51,11 @@ export default function LagrangeScene() {
 
   const systemDist = params.system === 'SE' ? AU_KM : MOON_SEMI_MAJOR_AXIS
 
+  // Body/marker sizes (needed before useMemo for L-point offset clamping)
+  const secondarySize = params.system === 'SE' ? 0.03 : 0.015
+  const markerHaloRadius = 0.025
+  const minLPointOffset = secondarySize + markerHaloRadius + 0.025
+
   // Compute L-point positions in normalized coords
   const lPointPositions = useMemo(() => {
     const points: { point: LagrangePoint; pos: [number, number, number] }[] = []
@@ -73,10 +78,20 @@ export default function LagrangeScene() {
         x = 0.5
         y = -Math.sqrt(3) / 2
       }
+
+      // Enforce minimum visual separation for L1/L2 from the secondary body
+      if (pt === 'L1' || pt === 'L2') {
+        const rawOffset = Math.abs(x - 1)
+        if (rawOffset < minLPointOffset) {
+          const sign = pt === 'L1' ? -1 : 1
+          x = 1 + sign * minLPointOffset
+        }
+      }
+
       points.push({ point: pt, pos: [x, 0, y] })
     }
     return points
-  }, [params.system, systemDist])
+  }, [params.system, systemDist, minLPointOffset])
 
   // Orbit points (shape depends on orbit type)
   const orbitPoints = useMemo(() => {
@@ -101,7 +116,6 @@ export default function LagrangeScene() {
   const primaryColor = params.system === 'SE' ? '#FDB813' : '#3B82F6'
   const secondaryColor = params.system === 'SE' ? '#3B82F6' : '#9CA3AF'
   const primarySize = params.system === 'SE' ? 0.06 : 0.04
-  const secondarySize = params.system === 'SE' ? 0.03 : 0.015
 
   return (
     <>

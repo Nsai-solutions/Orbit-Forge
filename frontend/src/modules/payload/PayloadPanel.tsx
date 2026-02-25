@@ -10,6 +10,7 @@ import {
   DEFAULT_SAR,
   DEFAULT_SATCOM,
 } from '@/types/payload'
+import { R_EARTH_EQUATORIAL } from '@/lib/constants'
 
 const TYPE_OPTIONS: { value: PayloadType; label: string }[] = [
   { value: 'earth-observation', label: 'EO' },
@@ -28,6 +29,7 @@ export default function PayloadPanel() {
   const updateSAR = useStore((s) => s.updatePayloadSAR)
   const satcom = useStore((s) => s.payloadSATCOM)
   const updateSATCOM = useStore((s) => s.updatePayloadSATCOM)
+  const updateElements = useStore((s) => s.updateElements)
 
   const handleTypeSwitch = (type: PayloadType) => {
     setPayloadType(type)
@@ -44,6 +46,12 @@ export default function PayloadPanel() {
     if (payloadType === 'earth-observation') updateEO({ ...DEFAULT_EO, ...preset.config as any })
     else if (payloadType === 'sar') updateSAR({ ...DEFAULT_SAR, ...preset.config as any })
     else updateSATCOM({ ...DEFAULT_SATCOM, ...preset.config as any })
+    if (preset.orbit) {
+      updateElements({
+        semiMajorAxis: R_EARTH_EQUATORIAL + preset.orbit.altitudeKm,
+        inclination: preset.orbit.inclinationDeg,
+      })
+    }
   }
 
   const presets = payloadType === 'earth-observation' ? EO_PRESETS

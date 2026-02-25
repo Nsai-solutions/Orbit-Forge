@@ -111,46 +111,129 @@ export function computeCommsDelay(distanceKm: number): number {
 }
 
 /**
- * Compute planet heliocentric position (simplified circular orbit)
+ * Solve Kepler's equation M = E - e*sin(E) using Newton-Raphson.
+ * Returns true anomaly in radians.
+ */
+function solveKeplerEquation(M_rad: number, e: number): number {
+  // Normalize M to [0, 2pi)
+  const twoPi = 2 * Math.PI
+  let M = ((M_rad % twoPi) + twoPi) % twoPi
+
+  // Initial guess
+  let E = M + e * Math.sin(M)
+
+  for (let i = 0; i < 30; i++) {
+    const dE = (E - e * Math.sin(E) - M) / (1 - e * Math.cos(E))
+    E -= dE
+    if (Math.abs(dE) < 1e-12) break
+  }
+
+  // Convert eccentric anomaly to true anomaly
+  const sinNu = Math.sqrt(1 - e * e) * Math.sin(E) / (1 - e * Math.cos(E))
+  const cosNu = (Math.cos(E) - e) / (1 - e * Math.cos(E))
+  return Math.atan2(sinNu, cosNu)
+}
+
+/**
+ * Compute Keplerian orbital state (position and velocity) at a date.
+ * Uses vis-viva for speed and flight path angle for velocity direction.
+ */
+function computeKeplerianState(
+  a: number, e: number, lonPeriDeg: number, meanLongDeg: number,
+  orbitalPeriodDays: number, daysSinceJ2000: number,
+): { pos: { x: number; y: number; z: number }; vel: { x: number; y: number; z: number } } {
+  const lonPeriRad = (lonPeriDeg * Math.PI) / 180
+  const meanMotion = 360 / orbitalPeriodDays
+  const meanLongRad = ((meanLongDeg + meanMotion * daysSinceJ2000) % 360) * Math.PI / 180
+
+  // Mean anomaly = mean longitude - longitude of perihelion
+  const M = meanLongRad - lonPeriRad
+  const nu = solveKeplerEquation(M, e)
+
+  // Heliocentric distance
+  const r = a * (1 - e * e) / (1 + e * Math.cos(nu))
+
+  // True longitude = longitude of perihelion + true anomaly
+  const trueLong = lonPeriRad + nu
+
+  // Position
+  const pos = {
+    x: r * Math.cos(trueLong),
+    y: 0,
+    z: r * Math.sin(trueLong),
+  }
+
+  // Velocity via vis-viva and flight path angle
+  const v = Math.sqrt(MU_SUN * (2 / r - 1 / a))
+  const gamma = Math.atan2(e * Math.sin(nu), 1 + e * Math.cos(nu))
+  const vTang = v * Math.cos(gamma)
+  const vRad = v * Math.sin(gamma)
+
+  // Tangential: (-sin(trueLong), 0, cos(trueLong))
+  // Radial: (cos(trueLong), 0, sin(trueLong))
+  const vel = {
+    x: vRad * Math.cos(trueLong) - vTang * Math.sin(trueLong),
+    y: 0,
+    z: vRad * Math.sin(trueLong) + vTang * Math.cos(trueLong),
+  }
+
+  return { pos, vel }
+}
+
+const J2000_MS = new Date('2000-01-01T12:00:00Z').getTime()
+
+/**
+ * Compute planet heliocentric position using Keplerian orbit model
  * Returns position in km in the ecliptic plane
- * Uses mean anomaly from J2000 epoch
  */
 export function computePlanetPosition(
   target: TargetBody,
   date: Date,
 ): { x: number; y: number; z: number } {
   const planet = PLANET_DATA[target]
-  const j2000 = new Date('2000-01-01T12:00:00Z')
-  const daysSinceJ2000 = (date.getTime() - j2000.getTime()) / 86400000
-
-  // Mean longitude (circular orbit approximation)
-  const meanMotion = 360 / planet.orbitalPeriodDays // deg/day
-  const meanLongitude = (planet.meanLongitudeAtJ2000Deg + meanMotion * daysSinceJ2000) % 360
-  const angleRad = (meanLongitude * Math.PI) / 180
-
-  const r = planet.semiMajorAxisKm
-  return {
-    x: r * Math.cos(angleRad),
-    y: 0, // ecliptic plane
-    z: r * Math.sin(angleRad),
-  }
+  const daysSinceJ2000 = (date.getTime() - J2000_MS) / 86400000
+  return computeKeplerianState(
+    planet.semiMajorAxisKm, planet.eccentricity, planet.longitudeOfPerihelionDeg,
+    planet.meanLongitudeAtJ2000Deg, planet.orbitalPeriodDays, daysSinceJ2000,
+  ).pos
 }
 
 /**
- * Compute Earth heliocentric position
+ * Compute Earth heliocentric position using Keplerian orbit model
  */
 export function computeEarthPosition(date: Date): { x: number; y: number; z: number } {
-  const j2000 = new Date('2000-01-01T12:00:00Z')
-  const daysSinceJ2000 = (date.getTime() - j2000.getTime()) / 86400000
-  const meanMotion = 360 / EARTH_ORBITAL_DATA.orbitalPeriodDays
-  const meanLongitude = (EARTH_ORBITAL_DATA.meanLongitudeAtJ2000Deg + meanMotion * daysSinceJ2000) % 360
-  const angleRad = (meanLongitude * Math.PI) / 180
-  const r = EARTH_ORBITAL_DATA.semiMajorAxisKm
-  return {
-    x: r * Math.cos(angleRad),
-    y: 0,
-    z: r * Math.sin(angleRad),
-  }
+  const daysSinceJ2000 = (date.getTime() - J2000_MS) / 86400000
+  return computeKeplerianState(
+    EARTH_ORBITAL_DATA.semiMajorAxisKm, EARTH_ORBITAL_DATA.eccentricity,
+    EARTH_ORBITAL_DATA.longitudeOfPerihelionDeg, EARTH_ORBITAL_DATA.meanLongitudeAtJ2000Deg,
+    EARTH_ORBITAL_DATA.orbitalPeriodDays, daysSinceJ2000,
+  ).pos
+}
+
+/**
+ * Compute Earth heliocentric velocity (km/s) at a given date
+ */
+export function computeEarthVelocity(date: Date): { x: number; y: number; z: number } {
+  const daysSinceJ2000 = (date.getTime() - J2000_MS) / 86400000
+  return computeKeplerianState(
+    EARTH_ORBITAL_DATA.semiMajorAxisKm, EARTH_ORBITAL_DATA.eccentricity,
+    EARTH_ORBITAL_DATA.longitudeOfPerihelionDeg, EARTH_ORBITAL_DATA.meanLongitudeAtJ2000Deg,
+    EARTH_ORBITAL_DATA.orbitalPeriodDays, daysSinceJ2000,
+  ).vel
+}
+
+/**
+ * Compute target planet heliocentric velocity (km/s) at a given date
+ */
+export function computePlanetVelocity(
+  target: TargetBody, date: Date,
+): { x: number; y: number; z: number } {
+  const planet = PLANET_DATA[target]
+  const daysSinceJ2000 = (date.getTime() - J2000_MS) / 86400000
+  return computeKeplerianState(
+    planet.semiMajorAxisKm, planet.eccentricity, planet.longitudeOfPerihelionDeg,
+    planet.meanLongitudeAtJ2000Deg, planet.orbitalPeriodDays, daysSinceJ2000,
+  ).vel
 }
 
 /**
@@ -303,27 +386,17 @@ export function computePorkchopGrid(
 
       const result = solveLambert(r1, r2, tofS, MU_SUN)
       if (result) {
-        // V-infinity at Earth
-        const vEarth = computeEarthPosition(depDate)
-        const vEarthOrb = Math.sqrt(MU_SUN / Math.sqrt(vEarth.x * vEarth.x + vEarth.z * vEarth.z))
-
-        // Earth's velocity direction (perpendicular to radial in ecliptic)
-        const rE = Math.sqrt(r1.x * r1.x + r1.z * r1.z)
-        const vEx = -vEarthOrb * r1.z / rE
-        const vEz = vEarthOrb * r1.x / rE
-
-        const dvx = result.vDepart.x - vEx
-        const dvz = result.vDepart.z - vEz
+        // V-infinity at Earth departure (Keplerian velocity)
+        const vE = computeEarthVelocity(depDate)
+        const dvx = result.vDepart.x - vE.x
+        const dvz = result.vDepart.z - vE.z
         const vInf = Math.sqrt(dvx * dvx + dvz * dvz)
         const c3 = vInf * vInf
 
-        // Arrival v-infinity
-        const rT = Math.sqrt(r2.x * r2.x + r2.z * r2.z)
-        const vTOrb = Math.sqrt(MU_SUN / rT)
-        const vTx = -vTOrb * r2.z / rT
-        const vTz = vTOrb * r2.x / rT
-        const avx = result.vArrive.x - vTx
-        const avz = result.vArrive.z - vTz
+        // Arrival v-infinity (Keplerian velocity)
+        const vT = computePlanetVelocity(target, arrDate)
+        const avx = result.vArrive.x - vT.x
+        const avz = result.vArrive.z - vT.z
         const vInfArr = Math.sqrt(avx * avx + avz * avz)
 
         if (c3 < 200 && c3 > 0) { // filter out unreasonable values
@@ -366,39 +439,29 @@ export function computeInterplanetaryResult(params: InterplanetaryParams): Inter
     const tofS = (arrDate.getTime() - depDate.getTime()) / 1000
     transferTimeDays = tofS / 86400
 
-    const computeC3FromResult = (result: ReturnType<typeof solveLambert>, r1pos: typeof r1) => {
+    const vE = computeEarthVelocity(depDate)
+    const computeC3FromResult = (result: ReturnType<typeof solveLambert>) => {
       if (!result) return Infinity
-      const rE = Math.sqrt(r1pos.x * r1pos.x + r1pos.z * r1pos.z)
-      const vEarthOrb = Math.sqrt(MU_SUN / rE)
-      const vEx = -vEarthOrb * r1pos.z / rE
-      const vEz = vEarthOrb * r1pos.x / rE
-      const dvx = result.vDepart.x - vEx
-      const dvz = result.vDepart.z - vEz
+      const dvx = result.vDepart.x - vE.x
+      const dvz = result.vDepart.z - vE.z
       return dvx * dvx + dvz * dvz
     }
 
     const resultShort = solveLambert(r1, r2, tofS, MU_SUN, true)
     const resultLong = solveLambert(r1, r2, tofS, MU_SUN, false)
-    const c3Short = computeC3FromResult(resultShort, r1)
-    const c3Long = computeC3FromResult(resultLong, r1)
+    const c3Short = computeC3FromResult(resultShort)
+    const c3Long = computeC3FromResult(resultLong)
     const bestResult = c3Short <= c3Long ? resultShort : resultLong
 
     if (bestResult) {
-      const rE = Math.sqrt(r1.x * r1.x + r1.z * r1.z)
-      const vEarthOrb = Math.sqrt(MU_SUN / rE)
-      const vEx = -vEarthOrb * r1.z / rE
-      const vEz = vEarthOrb * r1.x / rE
-      const dvx = bestResult.vDepart.x - vEx
-      const dvz = bestResult.vDepart.z - vEz
+      const dvx = bestResult.vDepart.x - vE.x
+      const dvz = bestResult.vDepart.z - vE.z
       vInfDepart = Math.sqrt(dvx * dvx + dvz * dvz)
       c3Km2s2 = vInfDepart * vInfDepart
 
-      const rT = Math.sqrt(r2.x * r2.x + r2.z * r2.z)
-      const vTOrb = Math.sqrt(MU_SUN / rT)
-      const vTx = -vTOrb * r2.z / rT
-      const vTz = vTOrb * r2.x / rT
-      const avx = bestResult.vArrive.x - vTx
-      const avz = bestResult.vArrive.z - vTz
+      const vT = computePlanetVelocity(targetBody, arrDate)
+      const avx = bestResult.vArrive.x - vT.x
+      const avz = bestResult.vArrive.z - vT.z
       vInfArrive = Math.sqrt(avx * avx + avz * avz)
     } else {
       const hohmann = computeHohmannInterplanetary(targetBody)
@@ -449,15 +512,19 @@ export function generatePlanetOrbitPoints(
   numPoints = 100,
 ): Array<{ x: number; y: number; z: number }> {
   const planet = PLANET_DATA[target]
-  const rAU = planet.semiMajorAxisAU
+  const a = planet.semiMajorAxisAU
+  const e = planet.eccentricity
+  const lonPeriRad = (planet.longitudeOfPerihelionDeg * Math.PI) / 180
 
   const points: Array<{ x: number; y: number; z: number }> = []
   for (let i = 0; i <= numPoints; i++) {
-    const theta = (i / numPoints) * 2 * Math.PI
+    const nu = (i / numPoints) * 2 * Math.PI
+    const r = a * (1 - e * e) / (1 + e * Math.cos(nu))
+    const trueLong = lonPeriRad + nu
     points.push({
-      x: rAU * Math.cos(theta),
+      x: r * Math.cos(trueLong),
       y: 0,
-      z: rAU * Math.sin(theta),
+      z: r * Math.sin(trueLong),
     })
   }
   return points
@@ -467,13 +534,18 @@ export function generatePlanetOrbitPoints(
  * Generate Earth orbit points for 3D rendering
  */
 export function generateEarthOrbitPoints(numPoints = 100): Array<{ x: number; y: number; z: number }> {
+  const e = EARTH_ORBITAL_DATA.eccentricity
+  const lonPeriRad = (EARTH_ORBITAL_DATA.longitudeOfPerihelionDeg * Math.PI) / 180
+
   const points: Array<{ x: number; y: number; z: number }> = []
   for (let i = 0; i <= numPoints; i++) {
-    const theta = (i / numPoints) * 2 * Math.PI
+    const nu = (i / numPoints) * 2 * Math.PI
+    const r = (1 - e * e) / (1 + e * Math.cos(nu)) // a = 1 AU
+    const trueLong = lonPeriRad + nu
     points.push({
-      x: Math.cos(theta),
+      x: r * Math.cos(trueLong),
       y: 0,
-      z: Math.sin(theta),
+      z: r * Math.sin(trueLong),
     })
   }
   return points
