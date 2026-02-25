@@ -195,6 +195,28 @@ export default function LandingPage() {
             <span style={{ fontSize: '14px', color: '#9CA3AF' }}>
               Free — No signup required
             </span>
+            <a
+              href="#validation"
+              className="transition-all duration-200"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                marginTop: '8px',
+                fontSize: '13px',
+                fontFamily: "'IBM Plex Sans', sans-serif",
+                color: '#9CA3AF',
+                textDecoration: 'none',
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.color = '#10B981')}
+              onMouseLeave={(e) => (e.currentTarget.style.color = '#9CA3AF')}
+            >
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" style={{ flexShrink: 0 }}>
+                <circle cx="7" cy="7" r="6" stroke="#10B981" strokeWidth="1.5" />
+                <path d="M4.5 7l1.8 1.8L9.5 5.5" stroke="#10B981" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              21/21 Tests Validated Against NASA/ESA Mission Data
+            </a>
           </div>
         </div>
 
