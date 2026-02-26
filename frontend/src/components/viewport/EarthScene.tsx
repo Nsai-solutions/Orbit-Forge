@@ -16,6 +16,7 @@ import StationVisibilityCones from './StationVisibilityCone'
 import PayloadFootprint from './PayloadFootprint'
 import SwathCorridor from './SwathCorridor'
 import SimulationClock from './SimulationClock'
+import { usePropagationSync } from '@/hooks/usePropagationSync'
 
 function AdaptiveControls() {
   const controlsRef = useRef<OrbitControlsType>(null)
@@ -53,6 +54,8 @@ function AdaptiveControls() {
 }
 
 export default function EarthScene() {
+  usePropagationSync()
+
   return (
     <>
       <SimulationClock />

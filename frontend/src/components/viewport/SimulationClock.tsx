@@ -1,8 +1,11 @@
 import { useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { useStore } from '@/stores'
-import { propagateOrbitPositions } from '@/lib/orbital-mechanics'
+import { propagateOrbitPositions, computeOrbitalPeriod } from '@/lib/orbital-mechanics'
 import { dateToGMST } from '@/lib/time-utils'
+import { eciToEcefThreeJS } from '@/lib/coordinate-transforms'
+import { interpolateTrajectory } from '@/lib/numerical-propagator'
+import type { Vec3 } from '@/types'
 
 export default function SimulationClock() {
   const lastGmstRef = useRef<number | null>(null)
@@ -15,6 +18,7 @@ export default function SimulationClock() {
       setSimTime,
       orbitEpoch, elements,
       setOrbitPositionsForSim,
+      propagationMode, propagatedTrajectory,
     } = state
 
     const currentEpochMs = orbitEpoch.getTime()
@@ -47,8 +51,26 @@ export default function SimulationClock() {
     if (gmstDiff < -Math.PI) gmstDiff += 2 * Math.PI
 
     if (Math.abs(gmstDiff) > 0.001) {
-      const newPositions = propagateOrbitPositions(elements, 180, new Date(newSimTime))
-      setOrbitPositionsForSim(newPositions)
+      if (propagationMode !== 'keplerian' && propagatedTrajectory.length > 0) {
+        // Numerical mode: sample ~180 points from trajectory for the next 1 orbit
+        const period = computeOrbitalPeriod(elements.semiMajorAxis)
+        const numPts = 180
+        const positions: Vec3[] = []
+        for (let i = 0; i <= numPts; i++) {
+          const tMs = newSimTime + (i / numPts) * period * 1000
+          const sv = interpolateTrajectory(propagatedTrajectory, tMs)
+          if (sv) {
+            // Compute GMST at this point's time for proper Earth-fixed rendering
+            const ptGmst = dateToGMST(new Date(tMs))
+            positions.push(eciToEcefThreeJS({ x: sv.x, y: sv.y, z: sv.z }, ptGmst))
+          }
+        }
+        if (positions.length > 2) setOrbitPositionsForSim(positions)
+      } else {
+        // Keplerian mode: existing analytical path
+        const newPositions = propagateOrbitPositions(elements, 180, new Date(newSimTime))
+        setOrbitPositionsForSim(newPositions)
+      }
       lastGmstRef.current = currentGmst
     }
   })

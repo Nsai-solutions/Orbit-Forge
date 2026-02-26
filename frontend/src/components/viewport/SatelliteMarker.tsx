@@ -10,8 +10,28 @@ import {
 import { keplerianToCartesian, eciToEcefThreeJS, eciToEcef, ecefToGeodetic } from '@/lib/coordinate-transforms'
 import { MU_EARTH_KM, DEG2RAD } from '@/lib/constants'
 import { dateToGMST } from '@/lib/time-utils'
+import { interpolateTrajectory } from '@/lib/numerical-propagator'
 import { sharedSatellitePosition, sharedSatellitePhase } from './SatellitePositionContext'
 import * as THREE from 'three'
+import type { Vec3 } from '@/types'
+import type { OrbitalElements } from '@/types/orbit'
+
+/** Compute satellite ECI position analytically (Kepler equation) */
+function computeAnalyticalPosition(elements: OrbitalElements, dtSec: number): { eciPos: Vec3; nu: number } {
+  const period = computeOrbitalPeriod(elements.semiMajorAxis)
+  const n = (2 * Math.PI) / period
+  const M0 = trueToMeanAnomaly(elements.trueAnomaly * DEG2RAD, elements.eccentricity)
+  let M = (M0 + n * dtSec) % (2 * Math.PI)
+  if (M < 0) M += 2 * Math.PI
+
+  const E = solveKeplerEquation(M, elements.eccentricity)
+  let nu = eccentricToTrueAnomaly(E, elements.eccentricity)
+  if (nu < 0) nu += 2 * Math.PI
+
+  const currentElements = { ...elements, trueAnomaly: nu / DEG2RAD }
+  const { position: eciPos } = keplerianToCartesian(currentElements, MU_EARTH_KM)
+  return { eciPos, nu }
+}
 
 export default function SatelliteMarker() {
   const groupRef = useRef<THREE.Group>(null)
@@ -21,27 +41,37 @@ export default function SatelliteMarker() {
   useFrame((_, delta) => {
     if (!groupRef.current) return
 
-    const { simTime, orbitEpoch, elements, setSatSubPoint } = useStore.getState()
+    const {
+      simTime, orbitEpoch, elements, setSatSubPoint,
+      propagationMode, propagatedTrajectory,
+    } = useStore.getState()
     const effectiveSimTime = simTime || orbitEpoch.getTime()
 
-    // Time since orbit epoch in seconds
-    const dtSec = (effectiveSimTime - orbitEpoch.getTime()) / 1000
+    let eciPos: Vec3
+    let nu = 0
 
-    // Compute mean anomaly at simTime
-    const period = computeOrbitalPeriod(elements.semiMajorAxis)
-    const n = (2 * Math.PI) / period
-    const M0 = trueToMeanAnomaly(elements.trueAnomaly * DEG2RAD, elements.eccentricity)
-    let M = (M0 + n * dtSec) % (2 * Math.PI)
-    if (M < 0) M += 2 * Math.PI
-
-    // Solve Kepler equation → true anomaly
-    const E = solveKeplerEquation(M, elements.eccentricity)
-    let nu = eccentricToTrueAnomaly(E, elements.eccentricity)
-    if (nu < 0) nu += 2 * Math.PI
-
-    // Compute ECI position
-    const currentElements = { ...elements, trueAnomaly: nu / DEG2RAD }
-    const { position: eciPos } = keplerianToCartesian(currentElements, MU_EARTH_KM)
+    if (propagationMode !== 'keplerian' && propagatedTrajectory.length > 0) {
+      // Numerical mode: interpolate from cached trajectory
+      const sv = interpolateTrajectory(propagatedTrajectory, effectiveSimTime)
+      if (sv) {
+        eciPos = { x: sv.x, y: sv.y, z: sv.z }
+        // Approximate phase for shared ref (not critical)
+        nu = Math.atan2(sv.y, sv.x)
+        if (nu < 0) nu += 2 * Math.PI
+      } else {
+        // Fallback to analytical if outside trajectory bounds
+        const dtSec = (effectiveSimTime - orbitEpoch.getTime()) / 1000
+        const result = computeAnalyticalPosition(elements, dtSec)
+        eciPos = result.eciPos
+        nu = result.nu
+      }
+    } else {
+      // Keplerian mode: analytical computation
+      const dtSec = (effectiveSimTime - orbitEpoch.getTime()) / 1000
+      const result = computeAnalyticalPosition(elements, dtSec)
+      eciPos = result.eciPos
+      nu = result.nu
+    }
 
     // ECEF transform using simTime GMST
     const gmst = dateToGMST(new Date(effectiveSimTime))

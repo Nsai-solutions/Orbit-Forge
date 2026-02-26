@@ -4,6 +4,22 @@ import { R_EARTH_EQUATORIAL } from '@/lib/constants'
 import { computeSunSyncInclination } from '@/lib/orbital-mechanics'
 import SliderInput from '@/components/ui/SliderInput'
 import SectionHeader from '@/components/ui/SectionHeader'
+import type { PropagationMode } from '@/lib/numerical-propagator'
+
+const PROPAGATION_MODES: { mode: PropagationMode; label: string }[] = [
+  { mode: 'keplerian', label: 'Keplerian' },
+  { mode: 'numerical-j2', label: 'J2' },
+  { mode: 'numerical-full', label: 'Full' },
+]
+
+const PERTURBATION_TOGGLES = [
+  { key: 'j2', label: 'J2 Oblateness' },
+  { key: 'j3j6', label: 'J3-J6 Zonal' },
+  { key: 'drag', label: 'Atmospheric Drag' },
+  { key: 'srp', label: 'Solar Radiation' },
+  { key: 'thirdBodyMoon', label: 'Moon Gravity' },
+  { key: 'thirdBodySun', label: 'Sun Gravity' },
+] as const
 
 const INCLINATION_PRESETS = [
   { label: '0\u00B0 Equatorial', value: 0 },
@@ -17,6 +33,13 @@ export default function OrbitInputPanel() {
   const elements = useStore((s) => s.elements)
   const updateElements = useStore((s) => s.updateElements)
   const setFromPreset = useStore((s) => s.setFromPreset)
+  const propagationMode = useStore((s) => s.propagationMode)
+  const setPropagationMode = useStore((s) => s.setPropagationMode)
+  const perturbationConfig = useStore((s) => s.perturbationConfig)
+  const setPerturbationConfig = useStore((s) => s.setPerturbationConfig)
+  const spacecraftProps = useStore((s) => s.spacecraftProps)
+  const setSpacecraftProps = useStore((s) => s.setSpacecraftProps)
+  const isPropagating = useStore((s) => s.isPropagating)
 
   const altitude = elements.semiMajorAxis - R_EARTH_EQUATORIAL
 
@@ -152,6 +175,106 @@ export default function OrbitInputPanel() {
           )
         })()}
       </SectionHeader>
+
+      {/* Propagation Mode */}
+      <SectionHeader
+        title="Propagation"
+        defaultOpen={true}
+        actions={
+          propagationMode !== 'keplerian' ? (
+            <span className="text-[9px] px-1.5 py-0.5 rounded bg-accent-green/15 text-accent-green border border-accent-green/30 font-mono">
+              NUMERICAL
+            </span>
+          ) : undefined
+        }
+      >
+        <div className="grid grid-cols-3 gap-1.5">
+          {PROPAGATION_MODES.map(({ mode, label }) => (
+            <button
+              key={mode}
+              onClick={() => setPropagationMode(mode)}
+              className={`text-[11px] px-2 py-1.5 rounded border transition-all font-sans ${
+                propagationMode === mode
+                  ? 'border-accent-blue/50 bg-accent-blue/15 text-accent-blue'
+                  : 'border-white/10 text-[var(--text-secondary)] hover:border-accent-blue/40 hover:text-accent-blue'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        {isPropagating && (
+          <p className="text-[10px] text-accent-amber animate-pulse mt-1">Propagating...</p>
+        )}
+        {propagationMode !== 'keplerian' && (
+          <p className="text-[10px] text-[var(--text-tertiary)] mt-1">
+            RK4 integration with {propagationMode === 'numerical-j2' ? 'J2 only' : 'full perturbations'}
+          </p>
+        )}
+      </SectionHeader>
+
+      {/* Perturbation Toggles */}
+      {propagationMode !== 'keplerian' && (
+        <SectionHeader title="Perturbations" defaultOpen={false}>
+          <div className="space-y-1.5">
+            {PERTURBATION_TOGGLES.map(({ key, label }) => (
+              <label key={key} className="flex items-center gap-2 text-[11px] text-[var(--text-secondary)] cursor-pointer hover:text-[var(--text-primary)] transition-colors">
+                <input
+                  type="checkbox"
+                  checked={perturbationConfig[key as keyof typeof perturbationConfig]}
+                  onChange={(e) => setPerturbationConfig({ [key]: e.target.checked })}
+                  className="accent-accent-blue w-3 h-3"
+                />
+                {label}
+              </label>
+            ))}
+          </div>
+        </SectionHeader>
+      )}
+
+      {/* Spacecraft Properties (for drag/SRP) */}
+      {propagationMode !== 'keplerian' && (perturbationConfig.drag || perturbationConfig.srp) && (
+        <SectionHeader title="Spacecraft Properties" defaultOpen={false}>
+          <SliderInput
+            label="Drag Coeff (Cd)"
+            value={spacecraftProps.cd}
+            min={1.0}
+            max={4.0}
+            step={0.1}
+            precision={1}
+            onChange={(v) => setSpacecraftProps({ cd: v })}
+          />
+          <SliderInput
+            label="SRP Coeff (Cr)"
+            value={spacecraftProps.cr}
+            min={0.5}
+            max={2.0}
+            step={0.1}
+            precision={1}
+            onChange={(v) => setSpacecraftProps({ cr: v })}
+          />
+          <SliderInput
+            label="Cross-Section"
+            value={spacecraftProps.area}
+            min={0.001}
+            max={1.0}
+            step={0.001}
+            unit="m\u00B2"
+            precision={3}
+            onChange={(v) => setSpacecraftProps({ area: v })}
+          />
+          <SliderInput
+            label="Mass"
+            value={spacecraftProps.mass}
+            min={0.5}
+            max={100}
+            step={0.5}
+            unit="kg"
+            precision={1}
+            onChange={(v) => setSpacecraftProps({ mass: v })}
+          />
+        </SectionHeader>
+      )}
     </div>
   )
 }

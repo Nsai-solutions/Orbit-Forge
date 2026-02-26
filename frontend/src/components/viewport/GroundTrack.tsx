@@ -2,15 +2,30 @@ import { useMemo } from 'react'
 import { Line } from '@react-three/drei'
 import { useStore } from '@/stores'
 import { computeGroundTrack } from '@/lib/orbital-mechanics'
-import { geodeticToThreeJS } from '@/lib/coordinate-transforms'
+import { geodeticToThreeJS, eciToEcef, ecefToGeodetic } from '@/lib/coordinate-transforms'
+import { dateToGMST } from '@/lib/time-utils'
 
 export default function GroundTrack() {
   const elements = useStore((s) => s.elements)
   const orbitEpoch = useStore((s) => s.orbitEpoch)
+  const propagationMode = useStore((s) => s.propagationMode)
+  const propagatedTrajectory = useStore((s) => s.propagatedTrajectory)
 
   const segments = useMemo(() => {
-    console.log('[GroundTrack] orbitEpoch:', orbitEpoch.toISOString(), 'ref:', orbitEpoch)
-    const track = computeGroundTrack(elements, orbitEpoch, 3, 180, false)
+    let track: Array<{ lat: number; lon: number }>
+
+    if (propagationMode !== 'keplerian' && propagatedTrajectory.length > 0) {
+      // Numerical mode: derive ground track from propagated trajectory
+      track = propagatedTrajectory.map((pt) => {
+        const gmst = dateToGMST(new Date(pt.t))
+        const ecef = eciToEcef({ x: pt.state.x, y: pt.state.y, z: pt.state.z }, gmst)
+        const geo = ecefToGeodetic(ecef)
+        return { lat: geo.lat, lon: geo.lon }
+      })
+    } else {
+      // Keplerian mode: existing analytical ground track
+      track = computeGroundTrack(elements, orbitEpoch, 3, 180, false)
+    }
 
     // Break track into segments at antimeridian crossings
     const segs: Array<[number, number, number][]> = []
@@ -36,7 +51,7 @@ export default function GroundTrack() {
     if (currentSeg.length >= 2) segs.push(currentSeg)
 
     return segs
-  }, [elements, orbitEpoch])
+  }, [elements, orbitEpoch, propagationMode, propagatedTrajectory])
 
   if (segments.length === 0) return null
 
