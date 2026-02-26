@@ -14,6 +14,7 @@ export interface PropagationSlice {
   numOrbits: number
   dtSec: number
   isPropagating: boolean
+  osculatingElements: OrbitalElements | null
 
   setPropagationMode: (mode: PropagationMode) => void
   setPerturbationConfig: (config: Partial<PerturbationConfig>) => void
@@ -21,6 +22,7 @@ export interface PropagationSlice {
   setNumOrbits: (n: number) => void
   runPropagation: (elements: OrbitalElements, epochMs: number) => void
   clearTrajectory: () => void
+  setOsculatingElements: (elements: OrbitalElements | null) => void
 }
 
 const DEFAULT_PERTURBATION_CONFIG: PerturbationConfig = {
@@ -48,6 +50,7 @@ export const createPropagationSlice: StateCreator<PropagationSlice, [], [], Prop
   numOrbits: 10,
   dtSec: 30,
   isPropagating: false,
+  osculatingElements: null,
 
   setPropagationMode: (mode) => {
     const config = mode === 'numerical-full'
@@ -77,5 +80,7 @@ export const createPropagationSlice: StateCreator<PropagationSlice, [], [], Prop
     set({ propagatedTrajectory: trajectory, propagationEpochMs: epochMs, isPropagating: false })
   },
 
-  clearTrajectory: () => set({ propagatedTrajectory: [], propagationEpochMs: 0 }),
+  clearTrajectory: () => set({ propagatedTrajectory: [], propagationEpochMs: 0, osculatingElements: null }),
+
+  setOsculatingElements: (elements) => set({ osculatingElements: elements }),
 })

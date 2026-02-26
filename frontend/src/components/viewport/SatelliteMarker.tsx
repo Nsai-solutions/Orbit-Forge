@@ -10,7 +10,7 @@ import {
 import { keplerianToCartesian, eciToEcefThreeJS, eciToEcef, ecefToGeodetic } from '@/lib/coordinate-transforms'
 import { MU_EARTH_KM, DEG2RAD } from '@/lib/constants'
 import { dateToGMST } from '@/lib/time-utils'
-import { interpolateTrajectory } from '@/lib/numerical-propagator'
+import { interpolateTrajectory, cartesianToKeplerian } from '@/lib/numerical-propagator'
 import { sharedSatellitePosition, sharedSatellitePhase } from './SatellitePositionContext'
 import * as THREE from 'three'
 import type { Vec3 } from '@/types'
@@ -37,13 +37,14 @@ export default function SatelliteMarker() {
   const groupRef = useRef<THREE.Group>(null)
   const glowRef = useRef<THREE.Mesh>(null)
   const subPointTimer = useRef(0)
+  const osculatingTimer = useRef(0)
 
   useFrame((_, delta) => {
     if (!groupRef.current) return
 
     const {
       simTime, orbitEpoch, elements, setSatSubPoint,
-      propagationMode, propagatedTrajectory,
+      propagationMode, propagatedTrajectory, setOsculatingElements,
     } = useStore.getState()
     const effectiveSimTime = simTime || orbitEpoch.getTime()
 
@@ -90,6 +91,19 @@ export default function SatelliteMarker() {
       const ecefKm = eciToEcef(eciPos, gmst)
       const geo = ecefToGeodetic(ecefKm)
       setSatSubPoint({ lat: geo.lat, lon: geo.lon })
+    }
+
+    // Compute osculating elements from numerical trajectory (~1Hz)
+    if (propagationMode !== 'keplerian' && propagatedTrajectory.length > 0) {
+      const now = Date.now()
+      if (now - osculatingTimer.current > 1000) {
+        osculatingTimer.current = now
+        const sv = interpolateTrajectory(propagatedTrajectory, effectiveSimTime)
+        if (sv) {
+          const oscElements = cartesianToKeplerian(sv)
+          setOsculatingElements(oscElements)
+        }
+      }
     }
 
     // Pulse the glow

@@ -1,6 +1,6 @@
 import { useStore } from '@/stores'
 import { classifyOrbit } from '@/types/orbit'
-import { R_EARTH_EQUATORIAL, getAtmosphericDensity } from '@/lib/constants'
+import { R_EARTH_EQUATORIAL, MU_EARTH_KM, getAtmosphericDensity } from '@/lib/constants'
 import {
   formatDistance,
   formatVelocity,
@@ -18,6 +18,8 @@ import { exportCSV } from '@/lib/csv-export'
 export default function OrbitalParamsDisplay() {
   const derivedParams = useStore((s) => s.derivedParams)
   const elements = useStore((s) => s.elements)
+  const propagationMode = useStore((s) => s.propagationMode)
+  const osculatingElements = useStore((s) => s.osculatingElements)
 
   if (!derivedParams) {
     return (
@@ -27,9 +29,29 @@ export default function OrbitalParamsDisplay() {
     )
   }
 
-  const avgAlt = (derivedParams.periapsisAlt + derivedParams.apoapsisAlt) / 2
-  const orbitType = classifyOrbit(avgAlt, elements.eccentricity, elements.inclination, derivedParams.raanDrift)
-  const atmDensity = getAtmosphericDensity(derivedParams.periapsisAlt)
+  // When in numerical mode with osculating elements, compute live derived params
+  const isNumerical = propagationMode !== 'keplerian' && osculatingElements !== null
+  const displayElements = isNumerical ? osculatingElements : elements
+
+  // Compute display values from osculating or static elements
+  const sma = displayElements.semiMajorAxis
+  const ecc = displayElements.eccentricity
+  const periapsisAlt = isNumerical ? sma * (1 - ecc) - R_EARTH_EQUATORIAL : derivedParams.periapsisAlt
+  const apoapsisAlt = isNumerical ? sma * (1 + ecc) - R_EARTH_EQUATORIAL : derivedParams.apoapsisAlt
+  const period = isNumerical ? 2 * Math.PI * Math.sqrt(Math.pow(sma, 3) / MU_EARTH_KM) : derivedParams.period
+  const revsPerDay = isNumerical ? 86400 / period : derivedParams.revsPerDay
+
+  // Velocities from vis-viva: v = sqrt(mu * (2/r - 1/a))
+  const vPerigee = isNumerical
+    ? Math.sqrt(MU_EARTH_KM * (2 / (sma * (1 - ecc)) - 1 / sma))
+    : derivedParams.velocityPerigee
+  const vApogee = isNumerical
+    ? Math.sqrt(MU_EARTH_KM * (2 / (sma * (1 + ecc)) - 1 / sma))
+    : derivedParams.velocityApogee
+
+  const avgAlt = (periapsisAlt + apoapsisAlt) / 2
+  const orbitType = classifyOrbit(avgAlt, ecc, displayElements.inclination, derivedParams.raanDrift)
+  const atmDensity = getAtmosphericDensity(periapsisAlt)
 
   return (
     <div className="space-y-3">
@@ -55,6 +77,11 @@ export default function OrbitalParamsDisplay() {
             LTAN {derivedParams.sunSyncLTAN}
           </span>
         )}
+        {isNumerical && (
+          <div className="px-2 py-0.5 rounded text-[9px] font-mono bg-accent-cyan/15 text-accent-cyan border border-accent-cyan/30">
+            OSCULATING
+          </div>
+        )}
       </div>
 
       {/* Key Parameters */}
@@ -65,31 +92,31 @@ export default function OrbitalParamsDisplay() {
             'orbital_parameters',
             ['Parameter', 'Value', 'Unit'],
             [
-              ['Semi-major Axis', elements.semiMajorAxis.toFixed(3), 'km'],
-              ['Eccentricity', elements.eccentricity.toFixed(6), ''],
-              ['Inclination', elements.inclination.toFixed(4), 'deg'],
-              ['RAAN', elements.raan.toFixed(4), 'deg'],
-              ['Arg of Perigee', elements.argOfPerigee.toFixed(4), 'deg'],
-              ['True Anomaly', elements.trueAnomaly.toFixed(4), 'deg'],
-              ['Period', (derivedParams.period / 60).toFixed(2), 'min'],
-              ['Perigee Altitude', derivedParams.periapsisAlt.toFixed(1), 'km'],
-              ['Apogee Altitude', derivedParams.apoapsisAlt.toFixed(1), 'km'],
-              ['V Perigee', derivedParams.velocityPerigee.toFixed(3), 'km/s'],
-              ['V Apogee', derivedParams.velocityApogee.toFixed(3), 'km/s'],
+              ['Semi-major Axis', sma.toFixed(3), 'km'],
+              ['Eccentricity', ecc.toFixed(6), ''],
+              ['Inclination', displayElements.inclination.toFixed(4), 'deg'],
+              ['RAAN', displayElements.raan.toFixed(4), 'deg'],
+              ['Arg of Perigee', displayElements.argOfPerigee.toFixed(4), 'deg'],
+              ['True Anomaly', displayElements.trueAnomaly.toFixed(4), 'deg'],
+              ['Period', (period / 60).toFixed(2), 'min'],
+              ['Perigee Altitude', periapsisAlt.toFixed(1), 'km'],
+              ['Apogee Altitude', apoapsisAlt.toFixed(1), 'km'],
+              ['V Perigee', vPerigee.toFixed(3), 'km/s'],
+              ['V Apogee', vApogee.toFixed(3), 'km/s'],
               ['RAAN Drift', derivedParams.raanDrift.toFixed(4), 'deg/day'],
-              ['Revs/Day', derivedParams.revsPerDay.toFixed(2), ''],
+              ['Revs/Day', revsPerDay.toFixed(2), ''],
               ['Eclipse Fraction', (derivedParams.eclipseFraction * 100).toFixed(1), '%'],
             ]
           )
         }} />
       }>
         <div className="grid grid-cols-2 gap-2">
-          <DataReadout label="Period" value={formatPeriodMinutes(derivedParams.period)} />
-          <DataReadout label="Revs/Day" value={formatRevsPerDay(derivedParams.revsPerDay)} />
-          <DataReadout label="Perigee Alt" value={formatDistance(derivedParams.periapsisAlt)} />
-          <DataReadout label="Apogee Alt" value={formatDistance(derivedParams.apoapsisAlt)} />
-          <DataReadout label="V Perigee" value={formatVelocity(derivedParams.velocityPerigee)} />
-          <DataReadout label="V Apogee" value={formatVelocity(derivedParams.velocityApogee)} />
+          <DataReadout label="Period" value={formatPeriodMinutes(period)} />
+          <DataReadout label="Revs/Day" value={formatRevsPerDay(revsPerDay)} />
+          <DataReadout label="Perigee Alt" value={formatDistance(periapsisAlt)} />
+          <DataReadout label="Apogee Alt" value={formatDistance(apoapsisAlt)} />
+          <DataReadout label="V Perigee" value={formatVelocity(vPerigee)} />
+          <DataReadout label="V Apogee" value={formatVelocity(vApogee)} />
         </div>
       </SectionHeader>
 
@@ -131,20 +158,20 @@ export default function OrbitalParamsDisplay() {
           <DataReadout
             label="Atm. Density"
             value={atmDensity.toExponential(2)}
-            unit="kg/m\u00B3"
+            unit="kg/m&#178;"
           />
         </div>
       </SectionHeader>
 
       {/* Raw Elements */}
-      <SectionHeader title="Classical Elements" defaultOpen={false}>
+      <SectionHeader title={isNumerical ? 'Osculating Elements' : 'Classical Elements'} defaultOpen={false}>
         <div className="grid grid-cols-1 gap-2">
-          <DataReadout label="Semi-major Axis" value={formatDistance(elements.semiMajorAxis)} />
-          <DataReadout label="Eccentricity" value={elements.eccentricity.toFixed(6)} />
-          <DataReadout label="Inclination" value={formatAngle(elements.inclination)} />
-          <DataReadout label="RAAN" value={formatAngle(elements.raan)} />
-          <DataReadout label="Arg. of Perigee" value={formatAngle(elements.argOfPerigee)} />
-          <DataReadout label="True Anomaly" value={formatAngle(elements.trueAnomaly)} />
+          <DataReadout label="Semi-major Axis" value={formatDistance(sma)} />
+          <DataReadout label="Eccentricity" value={ecc.toFixed(6)} />
+          <DataReadout label="Inclination" value={formatAngle(displayElements.inclination)} />
+          <DataReadout label="RAAN" value={formatAngle(displayElements.raan)} />
+          <DataReadout label="Arg. of Perigee" value={formatAngle(displayElements.argOfPerigee)} />
+          <DataReadout label="True Anomaly" value={formatAngle(displayElements.trueAnomaly)} />
         </div>
       </SectionHeader>
     </div>
