@@ -1,13 +1,13 @@
 import { useStore } from '@/stores'
 import { ORBIT_PRESETS } from '@/types/orbit'
-import { R_EARTH_EQUATORIAL } from '@/lib/constants'
+import { R_EARTH_EQUATORIAL, MU_EARTH_KM } from '@/lib/constants'
 import { computeSunSyncInclination } from '@/lib/orbital-mechanics'
 import SliderInput from '@/components/ui/SliderInput'
 import SectionHeader from '@/components/ui/SectionHeader'
 import type { PropagationMode } from '@/lib/numerical-propagator'
 
 const PROPAGATION_MODES: { mode: PropagationMode; label: string }[] = [
-  { mode: 'keplerian', label: 'Keplerian' },
+  { mode: 'keplerian', label: 'Kepler' },
   { mode: 'numerical-j2', label: 'J2' },
   { mode: 'numerical-full', label: 'Full' },
 ]
@@ -40,8 +40,15 @@ export default function OrbitInputPanel() {
   const spacecraftProps = useStore((s) => s.spacecraftProps)
   const setSpacecraftProps = useStore((s) => s.setSpacecraftProps)
   const isPropagating = useStore((s) => s.isPropagating)
+  const numOrbits = useStore((s) => s.numOrbits)
+  const setNumOrbits = useStore((s) => s.setNumOrbits)
 
   const altitude = elements.semiMajorAxis - R_EARTH_EQUATORIAL
+  const periodSec = 2 * Math.PI * Math.sqrt(Math.pow(elements.semiMajorAxis, 3) / MU_EARTH_KM)
+  const totalHours = numOrbits * periodSec / 3600
+  const durationText = totalHours > 48
+    ? `~${(totalHours / 24).toFixed(1)} days`
+    : `~${totalHours.toFixed(1)} hours`
 
   const handleAltitudeChange = (alt: number) => {
     updateElements({ semiMajorAxis: alt + R_EARTH_EQUATORIAL })
@@ -203,6 +210,20 @@ export default function OrbitInputPanel() {
             </button>
           ))}
         </div>
+        {propagationMode !== 'keplerian' && (
+          <div className="mt-2">
+            <SliderInput
+              label="PROP. ORBITS"
+              value={numOrbits}
+              min={5}
+              max={200}
+              step={5}
+              precision={0}
+              onChange={setNumOrbits}
+            />
+            <p className="text-[10px] text-[var(--text-tertiary)] mt-0.5">{durationText}</p>
+          </div>
+        )}
         {isPropagating && (
           <p className="text-[10px] text-accent-amber animate-pulse mt-1">Propagating...</p>
         )}
