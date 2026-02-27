@@ -42,7 +42,7 @@ export default function LifetimeDisplay() {
             unit="kg"
           />
           <DataReadout
-            label="CubeSat Size"
+            label="Bus Type"
             value={mission.spacecraft.size}
           />
           <DataReadout
