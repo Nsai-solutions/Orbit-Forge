@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useRef, useState, useEffect } from 'react'
 import Plot from 'react-plotly.js'
 import { useStore } from '@/stores'
 import { predictPasses } from '@/lib/pass-prediction'
@@ -47,7 +47,7 @@ export default function SkyPlotChart() {
         name: `${pass.aos.toISOString().slice(5, 16).replace('T', ' ')} (${pass.quality})`,
         line: {
           color: QUALITY_COLORS[pass.quality],
-          width: selectedPassIndex === passes.indexOf(pass) ? 3 : 1.5,
+          width: selectedPassIndex === passes.indexOf(pass) ? 4 : 2,
         },
         marker: {
           size: 2,
@@ -109,32 +109,46 @@ export default function SkyPlotChart() {
     ]
   }, [stationPasses])
 
+  // Measure container to compute a square size
+  const containerRef = useRef<HTMLDivElement>(null)
+  const [size, setSize] = useState({ w: 400, h: 400 })
+
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+    const ro = new ResizeObserver((entries) => {
+      const { width, height } = entries[0].contentRect
+      if (width > 0 && height > 0) setSize({ w: width, h: height })
+    })
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+
+  const side = Math.min(size.w, size.h)
+
   return (
-    <div className="h-full w-full flex items-center justify-center">
+    <div ref={containerRef} className="h-full w-full flex items-center justify-center overflow-hidden">
       <Plot
         data={[...traces, ...markerTraces]}
         layout={{
+          width: side,
+          height: side,
           paper_bgcolor: 'transparent',
           plot_bgcolor: 'transparent',
           font: { family: 'JetBrains Mono', size: 9, color: '#9CA3AF' },
-          margin: { l: 40, r: 40, t: 40, b: 40 },
-          showlegend: stationPasses.length <= 10,
-          legend: {
-            font: { size: 8, color: '#9CA3AF' },
-            bgcolor: 'transparent',
-            x: 1.05,
-            y: 1,
-          },
+          margin: { l: 20, r: 20, t: 30, b: 20 },
+          showlegend: false,
           title: {
-            text: focusStation ? `Sky Plot \u2014 ${focusStation}` : 'Sky Plot',
+            text: focusStation ? `Sky Plot — ${focusStation}` : 'Sky Plot',
             font: { size: 11, color: '#9CA3AF' },
           },
           polar: {
             bgcolor: 'transparent',
+            domain: { x: [0, 1], y: [0, 1] },
             radialaxis: {
               range: [0, 90],
-              tickvals: [0, 15, 30, 45, 60, 75, 90],
-              ticktext: ['90\u00B0', '75\u00B0', '60\u00B0', '45\u00B0', '30\u00B0', '15\u00B0', '0\u00B0'],
+              tickvals: [0, 30, 60, 90],
+              ticktext: ['90°', '60°', '30°', '0°'],
               gridcolor: 'rgba(255,255,255,0.08)',
               linecolor: 'rgba(255,255,255,0.1)',
               tickfont: { size: 8, color: '#6B7280' },
@@ -150,9 +164,8 @@ export default function SkyPlotChart() {
             },
           },
         }}
-        config={{ displayModeBar: false, responsive: true }}
-        style={{ width: '100%', height: '100%' }}
-        useResizeHandler
+        config={{ displayModeBar: false, responsive: false }}
+        style={{ width: side, height: side }}
       />
     </div>
   )
