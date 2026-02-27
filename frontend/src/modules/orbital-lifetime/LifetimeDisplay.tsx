@@ -49,12 +49,12 @@ export default function LifetimeDisplay() {
           <DataReadout
             label="Cross-Section"
             value={(crossSection * 1e4).toFixed(0)}
-            unit="cm&sup2;"
+            unit="cm²"
           />
           <DataReadout
             label="B* Coeff"
             value={bStar.toFixed(4)}
-            unit="m&sup2;/kg"
+            unit="m²/kg"
           />
         </div>
       </SectionHeader>
@@ -69,7 +69,7 @@ export default function LifetimeDisplay() {
           <DataReadout
             label="Density"
             value={density.toExponential(2)}
-            unit="kg/m&sup3;"
+            unit="kg/m³"
           />
         </div>
       </SectionHeader>

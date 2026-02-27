@@ -278,9 +278,9 @@ export default function OrbitInputPanel() {
             label="Cross-Section"
             value={spacecraftProps.area}
             min={0.001}
-            max={1.0}
+            max={10}
             step={0.001}
-            unit="m\u00B2"
+            unit="m²"
             precision={3}
             onChange={(v) => setSpacecraftProps({ area: v })}
           />
@@ -288,7 +288,7 @@ export default function OrbitInputPanel() {
             label="Mass"
             value={spacecraftProps.mass}
             min={0.5}
-            max={100}
+            max={500}
             step={0.5}
             unit="kg"
             precision={1}
