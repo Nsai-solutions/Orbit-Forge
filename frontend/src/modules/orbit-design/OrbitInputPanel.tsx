@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { useStore } from '@/stores'
 import { ORBIT_PRESETS } from '@/types/orbit'
 import { R_EARTH_EQUATORIAL, MU_EARTH_KM } from '@/lib/constants'
@@ -39,7 +40,17 @@ export default function OrbitInputPanel() {
   const setPerturbationConfig = useStore((s) => s.setPerturbationConfig)
   const spacecraftProps = useStore((s) => s.spacecraftProps)
   const setSpacecraftProps = useStore((s) => s.setSpacecraftProps)
+  const mission = useStore((s) => s.mission)
   const isPropagating = useStore((s) => s.isPropagating)
+
+  // Sync propagator spacecraft props from mission store values
+  useEffect(() => {
+    setSpacecraftProps({
+      mass: mission.spacecraft.mass,
+      area: mission.spacecraft.crossSectionArea,
+      cd: mission.spacecraft.dragCoefficient,
+    })
+  }, [mission.spacecraft.mass, mission.spacecraft.crossSectionArea, mission.spacecraft.dragCoefficient, setSpacecraftProps])
   const numOrbits = useStore((s) => s.numOrbits)
   const setNumOrbits = useStore((s) => s.setNumOrbits)
 
@@ -278,7 +289,7 @@ export default function OrbitInputPanel() {
             label="Cross-Section"
             value={spacecraftProps.area}
             min={0.001}
-            max={10}
+            max={20}
             step={0.001}
             unit="m²"
             precision={3}
@@ -288,7 +299,7 @@ export default function OrbitInputPanel() {
             label="Mass"
             value={spacecraftProps.mass}
             min={0.5}
-            max={500}
+            max={1000}
             step={0.5}
             unit="kg"
             precision={1}

@@ -11,7 +11,7 @@ import { computeDerivedParams } from './orbital-mechanics'
 import { computePowerAnalysis, DEFAULT_SUBSYSTEMS } from './power-budget'
 import type { PowerSubsystem } from './power-budget'
 import { predictPasses, computePassMetrics } from './pass-prediction'
-import { computeBallisticCoefficient, estimateCrossSection, checkCompliance } from './orbital-lifetime'
+import { computeBallisticCoefficient, checkCompliance } from './orbital-lifetime'
 import type { SolarActivity } from './orbital-lifetime'
 import { computeEOAnalysis } from './payload-eo'
 import { computeSATCOMAnalysis } from './payload-satcom'
@@ -277,6 +277,7 @@ function buildSpacecraft(input: Record<string, unknown>): SpacecraftConfig {
     ...DEFAULT_SPACECRAFT,
     size,
     mass: (input.spacecraft_mass_kg as number) || sizeSpec?.typicalMass.max || DEFAULT_SPACECRAFT.mass,
+    crossSectionArea: sizeSpec?.typicalCrossSection || DEFAULT_SPACECRAFT.crossSectionArea,
     solarPanelConfig: DEFAULT_SPACECRAFT.solarPanelConfig,
     pointingMode: DEFAULT_SPACECRAFT.pointingMode,
     solarPanelArea: panelArea,
@@ -409,6 +410,8 @@ function executeComputePowerBudget(input: Record<string, unknown>): Record<strin
   store.updateSpacecraft({
     size: spacecraft.size,
     mass: spacecraft.mass,
+    crossSectionArea: spacecraft.crossSectionArea,
+    dragCoefficient: spacecraft.dragCoefficient,
     solarPanelConfig: spacecraft.solarPanelConfig,
     solarPanelArea: spacecraft.solarPanelArea,
     solarCellEfficiency: spacecraft.solarCellEfficiency,
@@ -492,14 +495,15 @@ function executePredictLifetime(input: Record<string, unknown>): Record<string, 
   const massKg = (input.spacecraft_mass_kg as number) || CUBESAT_SIZES[size as CubeSatSize]?.typicalMass.max || 4
   const solarActivity = (input.solar_activity as SolarActivity) || 'moderate'
 
-  const crossSection = estimateCrossSection(size)
+  const crossSection = CUBESAT_SIZES[size as CubeSatSize]?.typicalCrossSection || 0.03
   const bStar = computeBallisticCoefficient(massKg, crossSection)
   const compliance = checkCompliance(altKm, bStar, solarActivity)
 
-  // Sync spacecraft mass to store
+  // Sync spacecraft properties to store
   useStore.getState().updateSpacecraft({
     size: size as CubeSatSize,
     mass: massKg,
+    crossSectionArea: crossSection,
   })
 
   return {

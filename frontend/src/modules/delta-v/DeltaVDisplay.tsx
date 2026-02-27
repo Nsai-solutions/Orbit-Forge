@@ -5,7 +5,7 @@ import MetricCard from '@/components/ui/MetricCard'
 import SectionHeader from '@/components/ui/SectionHeader'
 import { computeDeltaVBudget } from '@/lib/delta-v'
 import { R_EARTH_EQUATORIAL } from '@/lib/constants'
-import { computeBallisticCoefficient, estimateCrossSection } from '@/lib/orbital-lifetime'
+import { computeBallisticCoefficient } from '@/lib/orbital-lifetime'
 
 export default function DeltaVDisplay() {
   const elements = useStore((s) => s.elements)
@@ -15,8 +15,8 @@ export default function DeltaVDisplay() {
 
   const avgAlt = elements.semiMajorAxis - R_EARTH_EQUATORIAL
   const dryMass = mission.spacecraft.mass
-  const crossSection = estimateCrossSection(mission.spacecraft.size)
-  const bStar = computeBallisticCoefficient(dryMass, crossSection)
+  const crossSection = mission.spacecraft.crossSectionArea
+  const bStar = computeBallisticCoefficient(dryMass, crossSection, mission.spacecraft.dragCoefficient)
 
   const budget = useMemo(
     () => computeDeltaVBudget(propulsion, maneuvers, dryMass, avgAlt, mission.lifetimeTarget, bStar),

@@ -83,19 +83,20 @@ export default function MissionConfigPanel() {
         />
       </div>
 
-      {/* CubeSat Size */}
+      {/* Bus Type */}
       <SectionHeader title="Spacecraft" defaultOpen={true}>
         <label className="text-[11px] uppercase tracking-wider text-[var(--text-tertiary)] font-sans">
-          CubeSat Size
+          Bus Type
         </label>
-        <div className="grid grid-cols-3 gap-1.5 mt-1">
+        <div className="grid grid-cols-4 gap-1.5 mt-1">
           {(Object.entries(CUBESAT_SIZES) as [CubeSatSize, typeof CUBESAT_SIZES['1U']][]).map(([key, spec]) => (
             <button
               key={key}
               onClick={() => {
                 updateSpacecraft({
-                  size: key,
+                  size: key as CubeSatSize,
                   mass: spec.typicalMass.max,
+                  crossSectionArea: spec.typicalCrossSection,
                   solarPanelArea: spec.typicalPanelArea,
                 })
               }}
@@ -112,7 +113,9 @@ export default function MissionConfigPanel() {
           ))}
         </div>
 
-        <NumberField label="Mass" value={sc.mass} onChange={(v) => updateSpacecraft({ mass: v })} unit="kg" min={0.1} step={0.1} />
+        <NumberField label="Mass" value={sc.mass} onChange={(v) => updateSpacecraft({ mass: v })} unit="kg" min={0.1} max={1000} step={0.1} />
+        <NumberField label="Cross-Section Area" value={sc.crossSectionArea} onChange={(v) => updateSpacecraft({ crossSectionArea: v })} unit="m²" min={0.001} max={20} step={0.001} />
+        <NumberField label="Drag Coefficient (Cd)" value={sc.dragCoefficient} onChange={(v) => updateSpacecraft({ dragCoefficient: v })} min={1.0} max={4.0} step={0.1} />
 
         <SelectField
           label="Solar Panel Config"
@@ -125,7 +128,7 @@ export default function MissionConfigPanel() {
           ]}
         />
 
-        <NumberField label="Panel Area" value={sc.solarPanelArea} onChange={(v) => updateSpacecraft({ solarPanelArea: v })} unit="m\u00B2" min={0.01} step={0.01} />
+        <NumberField label="Panel Area" value={sc.solarPanelArea} onChange={(v) => updateSpacecraft({ solarPanelArea: v })} unit="m²" min={0.01} step={0.01} />
 
         <SelectField
           label="Solar Cell Efficiency"

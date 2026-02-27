@@ -3,7 +3,6 @@ import { useStore } from '@/stores'
 import SectionHeader from '@/components/ui/SectionHeader'
 import MetricCard from '@/components/ui/MetricCard'
 import {
-  estimateCrossSection,
   computeBallisticCoefficient,
   checkCompliance,
   type SolarActivity,
@@ -14,10 +13,10 @@ export default function LifetimeConfigPanel() {
   const mission = useStore((s) => s.mission)
 
   const [solarActivity, setSolarActivity] = useState<SolarActivity>('moderate')
-  const [dragCoeff, setDragCoeff] = useState(2.2)
 
   const avgAlt = elements.semiMajorAxis - 6378.137
-  const crossSection = estimateCrossSection(mission.spacecraft.size)
+  const crossSection = mission.spacecraft.crossSectionArea
+  const dragCoeff = mission.spacecraft.dragCoefficient
   const bStar = computeBallisticCoefficient(mission.spacecraft.mass, crossSection, dragCoeff)
 
   const compliance = useMemo(
@@ -41,29 +40,19 @@ export default function LifetimeConfigPanel() {
               <option value="high">High (250)</option>
             </select>
           </label>
-          <label className="flex items-center justify-between">
-            <span className="text-[10px] text-[var(--text-secondary)]">Drag Coeff (Cd)</span>
-            <div className="flex items-center gap-1.5">
-              <input
-                type="number"
-                value={dragCoeff}
-                onChange={(e) => setDragCoeff(parseFloat(e.target.value) || 2.2)}
-                className="input-field w-16 text-xs text-center"
-                step="0.1"
-                min="1.5"
-                max="3.5"
-              />
-              <span className="text-[11px] text-[var(--text-secondary)] font-mono">Cd</span>
-            </div>
-          </label>
+          <div className="flex items-center justify-between text-[10px]">
+            <span className="text-[var(--text-tertiary)]">Drag Coeff (Cd)</span>
+            <span className="text-accent-cyan font-mono">{dragCoeff.toFixed(1)}</span>
+          </div>
           <div className="flex items-center justify-between text-[10px]">
             <span className="text-[var(--text-tertiary)]">Cross-section</span>
-            <span className="text-accent-cyan font-mono">{(crossSection * 1e4).toFixed(0)} cm&sup2;</span>
+            <span className="text-accent-cyan font-mono">{crossSection < 0.01 ? (crossSection * 1e4).toFixed(0) + ' cm²' : crossSection.toFixed(3) + ' m²'}</span>
           </div>
           <div className="flex items-center justify-between text-[10px]">
             <span className="text-[var(--text-tertiary)]">B* coefficient</span>
-            <span className="text-accent-cyan font-mono">{bStar.toFixed(4)} m&sup2;/kg</span>
+            <span className="text-accent-cyan font-mono">{bStar.toFixed(4)} m²/kg</span>
           </div>
+          <p className="text-[9px] text-[var(--text-tertiary)] italic mt-1">Mass, cross-section, and Cd are set in the Mission tab.</p>
         </div>
       </SectionHeader>
 

@@ -53,6 +53,8 @@ export function cubeSatSurfaceArea(size: CubeSatSize): number {
     '3U': 2 * 0.01 + 4 * 0.03,   // 2*(10x10) + 4*(10x30)
     '6U': 2 * 0.02 + 2 * 0.06 + 2 * 0.03,
     '12U': 2 * 0.04 + 2 * 0.06 + 2 * 0.06,
+    'SmallSat': 3.0,              // ~1m cube approx
+    'Custom': 2 * 0.01 + 4 * 0.03,
   }
   return areas[size] || areas['3U']
 }
@@ -70,6 +72,8 @@ export function cubeSatSunFacingArea(size: CubeSatSize): number {
     '3U': 0.03,       // 10x30 cm long face
     '6U': 0.06,       // 20x30 cm long face
     '12U': 0.06,      // 20x30 cm face
+    'SmallSat': 0.5,   // user should adjust
+    'Custom': 0.03,
   }
   return areas[size] || areas['3U']
 }

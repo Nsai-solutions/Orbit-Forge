@@ -1,7 +1,7 @@
 import { computeDerivedParams } from './orbital-mechanics'
 import { computePowerAnalysis, totalAvgPowerDraw, subsystemAvgPower } from './power-budget'
 import { predictPasses, computePassMetrics } from './pass-prediction'
-import { estimateLifetime, checkCompliance, computeBallisticCoefficient, estimateCrossSection } from './orbital-lifetime'
+import { estimateLifetime, checkCompliance, computeBallisticCoefficient } from './orbital-lifetime'
 import { computeConstellationMetrics } from './constellation'
 import { computeDeltaVBudget, tsiolkovskyDeltaV } from './delta-v'
 import { computeRadiationEnvironment } from './radiation'
@@ -167,8 +167,8 @@ export async function generateMissionReport(state: ReportState): Promise<void> {
   const passMetrics = computePassMetrics(passes, 3, mission.spacecraft.dataRate)
 
   // Lifetime
-  const crossSection = estimateCrossSection(mission.spacecraft.size)
-  const bStar = computeBallisticCoefficient(mission.spacecraft.mass, crossSection)
+  const crossSection = mission.spacecraft.crossSectionArea
+  const bStar = computeBallisticCoefficient(mission.spacecraft.mass, crossSection, mission.spacecraft.dragCoefficient)
   const lifetimeDays = estimateLifetime(avgAlt, bStar, 'moderate')
   const compliance = checkCompliance(avgAlt, bStar, 'moderate')
 

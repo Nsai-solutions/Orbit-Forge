@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useStore } from '@/stores'
 import SectionHeader from '@/components/ui/SectionHeader'
 import { computePowerAnalysis, totalAvgPowerDraw } from '@/lib/power-budget'
-import { estimateLifetime, checkCompliance, computeBallisticCoefficient, estimateCrossSection } from '@/lib/orbital-lifetime'
+import { estimateLifetime, checkCompliance, computeBallisticCoefficient } from '@/lib/orbital-lifetime'
 import { computeDeltaVBudget, tsiolkovskyDeltaV } from '@/lib/delta-v'
 import { computeRadiationEnvironment } from '@/lib/radiation'
 import { computeDerivedParams } from '@/lib/orbital-mechanics'
@@ -45,8 +45,8 @@ export default function ComparisonPanel() {
     // Compute all metrics from current state
     const avgAlt = elements.semiMajorAxis - R_EARTH_EQUATORIAL
     const derived = computeDerivedParams(elements)
-    const crossSection = estimateCrossSection(mission.spacecraft.size)
-    const bStar = computeBallisticCoefficient(mission.spacecraft.mass, crossSection)
+    const crossSection = mission.spacecraft.crossSectionArea
+    const bStar = computeBallisticCoefficient(mission.spacecraft.mass, crossSection, mission.spacecraft.dragCoefficient)
 
     const power = computePowerAnalysis(elements, mission.spacecraft, subsystems, mission.lifetimeTarget)
     const lifetimeDays = estimateLifetime(avgAlt, bStar, 'moderate')

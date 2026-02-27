@@ -2,7 +2,6 @@ import { useMemo, useState } from 'react'
 import Plot from 'react-plotly.js'
 import { useStore } from '@/stores'
 import {
-  estimateCrossSection,
   computeBallisticCoefficient,
   simulateDecay,
   type SolarActivity,
@@ -13,8 +12,9 @@ export default function DecayCurveChart() {
   const mission = useStore((s) => s.mission)
 
   const avgAlt = elements.semiMajorAxis - 6378.137
-  const crossSection = estimateCrossSection(mission.spacecraft.size)
-  const bStar = computeBallisticCoefficient(mission.spacecraft.mass, crossSection)
+  const crossSection = mission.spacecraft.crossSectionArea
+  const cd = mission.spacecraft.dragCoefficient
+  const bStar = computeBallisticCoefficient(mission.spacecraft.mass, crossSection, cd)
 
   // Simulate decay for all three solar activity levels
   const decayData = useMemo(() => {
