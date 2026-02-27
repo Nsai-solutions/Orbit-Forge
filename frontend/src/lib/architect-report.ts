@@ -383,6 +383,7 @@ export async function generateArchitectReport(messages: ChatMessage[]): Promise<
         ['Spacecraft Size', `${r.spacecraft_size}`],
         ['Spacecraft Mass', `${r.spacecraft_mass_kg} kg`],
         ['Cross-Section', `${r.cross_section_m2} m\u00B2`],
+        ['Drag Coefficient', `${r.drag_coefficient || 2.2}`],
         ['Solar Activity', `${r.solar_activity}`],
         ['Natural Lifetime', `${r.lifetime_years} years (${r.lifetime_days} days)`],
         ['25-Year Rule (IADC)', (r.compliant_25_year_rule as boolean) ? 'COMPLIANT' : 'NON-COMPLIANT'],

@@ -164,7 +164,9 @@ function extractResultSections(messages: ChatMessage[]): ResultSection[] {
           })
           break
 
-        case 'compute_ground_passes':
+        case 'compute_ground_passes': {
+          const qb = result.pass_quality_breakdown as Record<string, number> | undefined
+          const qualityStr = qb ? `A:${qb.A} B:${qb.B} C:${qb.C} D:${qb.D}` : undefined
           sections.push({
             title: 'Ground Passes',
             moduleId: ModuleId.GroundPasses,
@@ -176,9 +178,11 @@ function extractResultSections(messages: ChatMessage[]): ResultSection[] {
               { label: 'Max Gap', value: `${result.max_gap_hours}`, unit: 'hrs' },
               { label: 'Daily Contact', value: `${result.daily_contact_time_minutes}`, unit: 'min' },
               { label: 'Daily Data', value: `${result.daily_data_throughput_mb}`, unit: 'MB' },
+              ...(qualityStr ? [{ label: 'Quality', value: qualityStr }] : []),
             ],
           })
           break
+        }
 
         case 'predict_lifetime':
           sections.push({
@@ -188,6 +192,8 @@ function extractResultSections(messages: ChatMessage[]): ResultSection[] {
             params: { altitude_km: tc.input.altitude_km },
             items: [
               { label: 'Lifetime', value: `${result.lifetime_years}`, unit: 'yrs' },
+              { label: 'Mass', value: `${result.spacecraft_mass_kg}`, unit: 'kg' },
+              { label: 'Cross-Section', value: `${result.cross_section_m2}`, unit: 'm\u00B2' },
               { label: '25-Year Rule', value: result.compliant_25_year_rule ? 'Compliant' : 'Non-compliant', status: result.compliant_25_year_rule ? 'nominal' : 'critical' },
               { label: 'FCC 5-Year', value: result.compliant_fcc_5_year_rule ? 'Compliant' : 'Non-compliant', status: result.compliant_fcc_5_year_rule ? 'nominal' : 'warning' },
               { label: 'Deorbit \u0394V', value: `${result.deorbit_delta_v_ms}`, unit: 'm/s' },

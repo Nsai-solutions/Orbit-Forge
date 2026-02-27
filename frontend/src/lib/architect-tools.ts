@@ -47,7 +47,7 @@ export const TOOL_DEFINITIONS: AnthropicToolDef[] = [
       properties: {
         altitude_km: { type: 'number', description: 'Orbital altitude in km' },
         inclination_deg: { type: 'number', description: 'Orbital inclination in degrees' },
-        spacecraft_size: { type: 'string', enum: ['1U', '1.5U', '2U', '3U', '6U', '12U'], description: 'CubeSat form factor' },
+        spacecraft_size: { type: 'string', enum: ['1U', '1.5U', '2U', '3U', '6U', '12U', 'SmallSat', 'Custom'], description: 'Spacecraft bus type (CubeSat size, SmallSat, or Custom)' },
         spacecraft_mass_kg: { type: 'number', description: 'Spacecraft mass in kg' },
         solar_panel_config: { type: 'string', enum: ['body-mounted', '1-axis-deployable', '2-axis-deployable'], description: 'Solar panel configuration' },
         pointing_mode: { type: 'string', enum: ['tumbling', 'nadir-pointing', 'sun-pointing'], description: 'Spacecraft pointing mode' },
@@ -74,7 +74,7 @@ export const TOOL_DEFINITIONS: AnthropicToolDef[] = [
   },
   {
     name: 'compute_ground_passes',
-    description: 'Predict satellite ground station passes and compute communication metrics including passes per day, average duration, maximum gap between contacts, and daily data throughput.',
+    description: 'Predict satellite ground station passes and compute communication metrics including passes per day, average duration, maximum gap between contacts, daily data throughput, and pass quality grades (A/B/C/D based on max elevation). Each pass includes a quality grade: A (>60° max el, excellent), B (30-60°, good), C (10-30°, marginal), D (<10°, poor). The Ground Passes tab also provides per-pass RF link budgets and visualization charts.',
     input_schema: {
       type: 'object',
       properties: {
@@ -102,13 +102,15 @@ export const TOOL_DEFINITIONS: AnthropicToolDef[] = [
   },
   {
     name: 'predict_lifetime',
-    description: 'Estimate orbital lifetime from atmospheric drag and check compliance with debris mitigation guidelines (25-year rule and FCC 5-year rule). Returns lifetime estimate, deorbit delta-V needed, and compliance status.',
+    description: 'Estimate orbital lifetime from atmospheric drag and check compliance with debris mitigation guidelines (25-year rule and FCC 5-year rule). Returns lifetime estimate, deorbit delta-V needed, and compliance status. You can specify cross-section area directly for non-CubeSat spacecraft.',
     input_schema: {
       type: 'object',
       properties: {
         altitude_km: { type: 'number', description: 'Orbital altitude in km' },
         spacecraft_mass_kg: { type: 'number', description: 'Spacecraft mass in kg. Default: 4' },
-        spacecraft_size: { type: 'string', enum: ['1U', '1.5U', '2U', '3U', '6U', '12U'], description: 'CubeSat size for drag area estimation. Default: 3U' },
+        spacecraft_size: { type: 'string', enum: ['1U', '1.5U', '2U', '3U', '6U', '12U', 'SmallSat', 'Custom'], description: 'Bus type. For CubeSats, auto-fills cross-section. Use SmallSat or Custom for larger spacecraft. Default: 3U' },
+        cross_section_m2: { type: 'number', description: 'Cross-sectional drag area in m². Overrides the default for the selected bus type. Use this for non-CubeSat spacecraft.' },
+        drag_coefficient: { type: 'number', description: 'Drag coefficient Cd (1.0-4.0). Default: 2.2' },
         solar_activity: { type: 'string', enum: ['low', 'moderate', 'high'], description: 'Solar activity level affecting atmospheric density. Default: moderate' },
       },
       required: ['altitude_km'],
@@ -475,6 +477,10 @@ function executeComputeGroundPasses(input: Record<string, unknown>): Record<stri
       quality: p.quality,
     }))
 
+  // Quality breakdown
+  const qualityCounts = { A: 0, B: 0, C: 0, D: 0 }
+  passes.forEach((p) => { qualityCounts[p.quality as keyof typeof qualityCounts]++ })
+
   return {
     ground_stations: stations.map((s) => ({ name: s.name, lat: s.lat, lon: s.lon })),
     simulation_days: durationDays,
@@ -485,7 +491,9 @@ function executeComputeGroundPasses(input: Record<string, unknown>): Record<stri
     daily_contact_time_minutes: +metrics.dailyContactMin.toFixed(1),
     daily_data_throughput_mb: +metrics.dailyDataMB.toFixed(1),
     data_rate_kbps: dataRateKbps,
+    pass_quality_breakdown: qualityCounts,
     best_passes: topPasses,
+    note: 'Per-pass RF link budgets and visualization charts (contact timeline, link waterfall, sky plot) are available in the Ground Passes tab.',
   }
 }
 
@@ -494,9 +502,11 @@ function executePredictLifetime(input: Record<string, unknown>): Record<string, 
   const size = (input.spacecraft_size as string) || '3U'
   const massKg = (input.spacecraft_mass_kg as number) || CUBESAT_SIZES[size as CubeSatSize]?.typicalMass.max || 4
   const solarActivity = (input.solar_activity as SolarActivity) || 'moderate'
+  const cd = (input.drag_coefficient as number) || 2.2
 
-  const crossSection = CUBESAT_SIZES[size as CubeSatSize]?.typicalCrossSection || 0.03
-  const bStar = computeBallisticCoefficient(massKg, crossSection)
+  // Use explicit cross-section if provided, otherwise derive from bus type
+  const crossSection = (input.cross_section_m2 as number) || CUBESAT_SIZES[size as CubeSatSize]?.typicalCrossSection || 0.03
+  const bStar = computeBallisticCoefficient(massKg, crossSection, cd)
   const compliance = checkCompliance(altKm, bStar, solarActivity)
 
   // Sync spacecraft properties to store
@@ -504,6 +514,7 @@ function executePredictLifetime(input: Record<string, unknown>): Record<string, 
     size: size as CubeSatSize,
     mass: massKg,
     crossSectionArea: crossSection,
+    dragCoefficient: cd,
   })
 
   return {
@@ -511,6 +522,7 @@ function executePredictLifetime(input: Record<string, unknown>): Record<string, 
     spacecraft_size: size,
     spacecraft_mass_kg: massKg,
     cross_section_m2: +crossSection.toFixed(4),
+    drag_coefficient: cd,
     ballistic_coefficient_m2_per_kg: +bStar.toFixed(6),
     solar_activity: solarActivity,
     lifetime_days: +compliance.lifetimeDays.toFixed(0),
