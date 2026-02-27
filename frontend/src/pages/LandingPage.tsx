@@ -91,6 +91,19 @@ export default function LandingPage() {
           </span>
           <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
             <a
+              href="#guide"
+              className="text-sm transition-all duration-200"
+              style={{
+                color: '#6B7280',
+                textDecoration: 'none',
+                fontFamily: "'IBM Plex Sans', sans-serif",
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.color = '#3B82F6')}
+              onMouseLeave={(e) => (e.currentTarget.style.color = '#6B7280')}
+            >
+              User Guide
+            </a>
+            <a
               href="#validation"
               className="text-sm transition-all duration-200"
               style={{

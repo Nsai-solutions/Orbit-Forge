@@ -3,6 +3,7 @@ import { useStore } from '@/stores'
 import { ModuleId } from '@/types'
 import LandingPage from '@/pages/LandingPage'
 import ValidationPage from '@/pages/ValidationPage'
+import GuidePage from '@/pages/GuidePage'
 import TopBar from '@/components/layout/TopBar'
 import LeftPanel from '@/components/layout/LeftPanel'
 import RightPanel from '@/components/layout/RightPanel'
@@ -141,10 +142,11 @@ function BottomPanelContent() {
 }
 
 export default function App() {
-  const [view, setView] = useState<'landing' | 'app' | 'validation'>(() => {
+  const [view, setView] = useState<'landing' | 'app' | 'validation' | 'guide'>(() => {
     const hash = window.location.hash
     if (hash === '#app') return 'app'
     if (hash === '#validation') return 'validation'
+    if (hash === '#guide') return 'guide'
     return 'landing'
   })
   const [saveDialogOpen, setSaveDialogOpen] = useState(false)
@@ -155,6 +157,7 @@ export default function App() {
       const hash = window.location.hash
       if (hash === '#app') setView('app')
       else if (hash === '#validation') setView('validation')
+      else if (hash === '#guide') setView('guide')
       else setView('landing')
     }
     window.addEventListener('hashchange', onHash)
@@ -162,6 +165,7 @@ export default function App() {
   }, [])
 
   if (view === 'validation') return <ValidationPage />
+  if (view === 'guide') return <GuidePage />
 
   if (view === 'landing') return <LandingPage />
 

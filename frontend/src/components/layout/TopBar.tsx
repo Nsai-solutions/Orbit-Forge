@@ -75,6 +75,12 @@ export default function TopBar({ onSaveLoad }: TopBarProps) {
           <span className="w-1.5 h-1.5 rounded-full bg-accent-green inline-block" />
           Validated
         </a>
+        <a
+          href="#guide"
+          className="px-3 py-1 rounded text-[11px] font-sans text-[var(--text-secondary)] border border-white/10 hover:border-accent-blue/30 hover:text-accent-blue transition-all no-underline"
+        >
+          Guide
+        </a>
         <button
           onClick={handleReport}
           disabled={reportStatus === 'generating'}
