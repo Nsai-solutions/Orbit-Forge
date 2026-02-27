@@ -3,6 +3,8 @@ import { OrbitalElements, keplerianToCartesian, eciToEcef, ecefToGeodetic, geode
 import { computeOrbitalPeriod, solveKeplerEquation, eccentricToTrueAnomaly, trueToMeanAnomaly, computeJ2RAANDrift, computeJ2ArgPerigeeDrift } from './orbital-mechanics'
 import { dateToGMST } from './time-utils'
 import type { GroundStation } from '@/types/ground-station'
+import type { CommConfig } from './link-budget'
+import { computePassLinkBudget } from './link-budget'
 
 export interface SatellitePass {
   station: string
@@ -15,6 +17,13 @@ export interface SatellitePass {
   losAzimuth: number    // degrees
   durationSec: number
   quality: 'A' | 'B' | 'C' | 'D'
+  // Per-pass link budget (populated when comm config available)
+  linkMarginDb?: number
+  maxDataRateKbps?: number
+  dataVolumeMB?: number
+  marginStatus?: 'nominal' | 'warning' | 'critical'
+  // Azimuth/elevation track for sky plot
+  track?: Array<{ azimuth: number; elevation: number; timeSec: number }>
 }
 
 /**
@@ -105,10 +114,12 @@ export function predictPasses(
   stations: GroundStation[],
   durationDays: number,
   stepSec = 30,
+  options?: { recordTrack?: boolean },
 ): SatellitePass[] {
   const passes: SatellitePass[] = []
   const totalSec = durationDays * SEC_PER_DAY
   const activeStations = stations.filter((s) => s.active)
+  const recordTrack = options?.recordTrack ?? false
 
   if (activeStations.length === 0) return passes
 
@@ -120,6 +131,7 @@ export function predictPasses(
     let maxEl = 0
     let maxElTime = 0
     let lastAz = 0
+    let track: Array<{ azimuth: number; elevation: number; timeSec: number }> = []
 
     for (let t = 0; t <= totalSec; t += stepSec) {
       const satEci = getPositionAtTime(elements, epoch, t)
@@ -137,12 +149,16 @@ export function predictPasses(
           passStartAz = azimuth
           maxEl = elevation
           maxElTime = t
+          track = []
         }
         if (elevation > maxEl) {
           maxEl = elevation
           maxElTime = t
         }
         lastAz = azimuth
+        if (recordTrack) {
+          track.push({ azimuth, elevation, timeSec: t - passStart })
+        }
       } else if (inPass) {
         // Pass ends
         inPass = false
@@ -166,6 +182,7 @@ export function predictPasses(
             losAzimuth: lastAz,
             durationSec,
             quality,
+            ...(recordTrack ? { track } : {}),
           })
         }
       }
@@ -178,6 +195,26 @@ export function predictPasses(
 }
 
 /**
+ * Enrich passes with per-pass link budget data
+ */
+export function enrichPassesWithLinkBudget(
+  passes: SatellitePass[],
+  comm: CommConfig,
+  altitudeKm: number,
+): SatellitePass[] {
+  return passes.map((pass) => {
+    const result = computePassLinkBudget(comm, altitudeKm, pass.maxElevation, pass.durationSec)
+    return {
+      ...pass,
+      linkMarginDb: result.linkMarginDb,
+      maxDataRateKbps: result.maxDataRateKbps,
+      dataVolumeMB: result.dataVolumeMB,
+      marginStatus: result.marginStatus,
+    }
+  })
+}
+
+/**
  * Compute pass communication metrics
  */
 export interface PassCommsMetrics {
@@ -186,6 +223,8 @@ export interface PassCommsMetrics {
   maxGapHours: number
   dailyContactMin: number
   dailyDataMB: number
+  totalContactMin: number
+  totalPasses: number
 }
 
 export function computePassMetrics(
@@ -200,6 +239,8 @@ export function computePassMetrics(
       maxGapHours: durationDays * 24,
       dailyContactMin: 0,
       dailyDataMB: 0,
+      totalContactMin: 0,
+      totalPasses: 0,
     }
   }
 
@@ -213,12 +254,20 @@ export function computePassMetrics(
     maxGapSec = Math.max(maxGapSec, gap / 1000)
   }
 
-  const dailyContactSec = passes.reduce((s, p) => s + p.durationSec, 0) / Math.max(1, durationDays)
+  const totalContactSec = passes.reduce((s, p) => s + p.durationSec, 0)
+  const dailyContactSec = totalContactSec / Math.max(1, durationDays)
 
-  // Data throughput: rate * contact time * link efficiency (~70%)
-  const linkEfficiency = 0.7
-  const dailyDataBits = dataRateKbps * 1000 * dailyContactSec * linkEfficiency
-  const dailyDataMB = dailyDataBits / 8 / 1024 / 1024
+  // If passes have per-pass data volume from link budget, use that
+  const hasLinkData = passes.some((p) => p.dataVolumeMB != null)
+  let dailyDataMB: number
+  if (hasLinkData) {
+    const totalDataMB = passes.reduce((s, p) => s + (p.dataVolumeMB ?? 0), 0)
+    dailyDataMB = totalDataMB / Math.max(1, durationDays)
+  } else {
+    const linkEfficiency = 0.7
+    const dailyDataBits = dataRateKbps * 1000 * dailyContactSec * linkEfficiency
+    dailyDataMB = dailyDataBits / 8 / 1024 / 1024
+  }
 
   return {
     totalPassesPerDay,
@@ -226,5 +275,47 @@ export function computePassMetrics(
     maxGapHours: maxGapSec / 3600,
     dailyContactMin: dailyContactSec / 60,
     dailyDataMB,
+    totalContactMin: totalContactSec / 60,
+    totalPasses: passes.length,
   }
+}
+
+/**
+ * Compute contact gaps between consecutive passes
+ */
+export interface ContactGap {
+  start: Date
+  end: Date
+  durationHours: number
+  isLongest: boolean
+}
+
+export function computeContactGaps(passes: SatellitePass[]): ContactGap[] {
+  if (passes.length < 2) return []
+
+  const sorted = [...passes].sort((a, b) => a.aos.getTime() - b.aos.getTime())
+  const gaps: ContactGap[] = []
+  let maxGap = 0
+
+  for (let i = 1; i < sorted.length; i++) {
+    const gapMs = sorted[i].aos.getTime() - sorted[i - 1].los.getTime()
+    if (gapMs > 0) {
+      const durationHours = gapMs / 3600000
+      gaps.push({
+        start: sorted[i - 1].los,
+        end: sorted[i].aos,
+        durationHours,
+        isLongest: false,
+      })
+      maxGap = Math.max(maxGap, gapMs)
+    }
+  }
+
+  // Mark the longest gap
+  if (gaps.length > 0) {
+    const longest = gaps.reduce((max, g) => g.durationHours > max.durationHours ? g : max, gaps[0])
+    longest.isLongest = true
+  }
+
+  return gaps
 }

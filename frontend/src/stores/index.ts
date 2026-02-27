@@ -14,8 +14,9 @@ import { BeyondLeoSlice, createBeyondLeoSlice } from './beyond-leo-slice'
 import { ArchitectSlice, createArchitectSlice } from './architect-slice'
 import { SimulationSlice, createSimulationSlice } from './simulation-slice'
 import { PropagationSlice, createPropagationSlice } from './propagation-slice'
+import { CommSlice, createCommSlice } from './comm-slice'
 
-export type AppStore = UISlice & MissionSlice & OrbitSlice & GroundSlice & PowerSlice & ConstellationSlice & DeltaVSlice & RadiationSlice & ComparisonSlice & PayloadSlice & BeyondLeoSlice & ArchitectSlice & SimulationSlice & PropagationSlice
+export type AppStore = UISlice & MissionSlice & OrbitSlice & GroundSlice & PowerSlice & ConstellationSlice & DeltaVSlice & RadiationSlice & ComparisonSlice & PayloadSlice & BeyondLeoSlice & ArchitectSlice & SimulationSlice & PropagationSlice & CommSlice
 
 export const useStore = create<AppStore>()(
   devtools(
@@ -35,10 +36,11 @@ export const useStore = create<AppStore>()(
         ...createArchitectSlice(...a),
         ...createSimulationSlice(...a),
         ...createPropagationSlice(...a),
+        ...createCommSlice(...a),
       }),
       {
         name: 'orbitforge-autosave',
-        version: 16,
+        version: 17,
         migrate: (persisted: any, version: number) => {
           if (version < 8) {
             const { groundStations, ...rest } = persisted || {}
@@ -87,6 +89,10 @@ export const useStore = create<AppStore>()(
           if (version < 16) {
             // No migration needed — new slice fields get defaults
           }
+          // v17: Comm slice fields are new; defaults applied by slice initializer
+          if (version < 17) {
+            // No migration needed — new slice fields get defaults
+          }
           return persisted as any
         },
         merge: (persisted, current) => {
@@ -130,6 +136,7 @@ export const useStore = create<AppStore>()(
           perturbationConfig: state.perturbationConfig,
           spacecraftProps: state.spacecraftProps,
           numOrbits: state.numOrbits,
+          commConfig: state.commConfig,
           mission: {
             ...state.mission,
             epoch: state.mission.epoch instanceof Date
