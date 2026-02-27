@@ -62,7 +62,8 @@ html, body, #root {
 
 /* Landing page and validation page need scrolling */
 #root:has(.landing-page),
-#root:has(.validation-page) {
+#root:has(.validation-page),
+#root:has(.guide-page) {
   overflow: auto;
 }
 
