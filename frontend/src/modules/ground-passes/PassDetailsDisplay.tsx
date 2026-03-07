@@ -9,43 +9,6 @@ import EquationsPanel from '@/components/ui/EquationsPanel'
 import type { Equation } from '@/components/ui/EquationsPanel'
 import LinkBudgetSection from './LinkBudgetSection'
 
-const passEquations: Equation[] = [
-  {
-    name: 'Free Space Path Loss',
-    formula: 'FSPL = 20 \u00D7 log\u2081\u2080(4\u03C0d/\u03BB) dB',
-    variables: [
-      { symbol: 'd', definition: 'slant range (m)' },
-      { symbol: '\u03BB', definition: 'wavelength (m) = c/f' },
-    ],
-  },
-  {
-    name: 'Slant Range',
-    formula: 'd = \u221A((R\u2091+h)\u00B2 - (R\u2091\u00D7cos(el))\u00B2) - R\u2091\u00D7sin(el)',
-    variables: [
-      { symbol: 'h', definition: 'orbital altitude (km)' },
-      { symbol: 'el', definition: 'elevation angle' },
-    ],
-  },
-  {
-    name: 'EIRP',
-    formula: 'EIRP = P_tx + G_tx (dBW)',
-    variables: [
-      { symbol: 'P_tx', definition: 'transmit power (dBW)' },
-      { symbol: 'G_tx', definition: 'transmit antenna gain (dBi)' },
-    ],
-  },
-  {
-    name: 'Link Margin',
-    formula: 'C/N\u2080 = EIRP - FSPL - L_atm - L_rain + G/T + 228.6',
-    description: 'Margin = C/N\u2080 - C/N\u2080_required (dB-Hz)',
-  },
-  {
-    name: 'Atmospheric Loss',
-    formula: 'L_atm = L_zenith / sin(el)',
-    description: 'Varies by frequency band: ~0.5 dB (UHF) to ~5 dB (Ka-band) at zenith.',
-  },
-]
-
 export default function PassDetailsDisplay() {
   const elements = useStore((s) => s.elements)
   const mission = useStore((s) => s.mission)
@@ -97,6 +60,55 @@ export default function PassDetailsDisplay() {
     if (!selectedPass) return null
     return computePassLinkBudget(commConfig, avgAlt, selectedPass.maxElevation, selectedPass.durationSec)
   }, [selectedPass, commConfig, avgAlt])
+
+  const freqMHz = commConfig.frequencyMHz || 437
+  const wavelengthM = 299792458 / (freqMHz * 1e6)
+  const txPowerDbw = 10 * Math.log10(commConfig.txPowerW)
+  const eirpDbw = txPowerDbw + commConfig.satAntennaGainDbi
+  // Compute slant range at 10° elevation for reference
+  const elRef = 10
+  const elRad = elRef * Math.PI / 180
+  const rE = R_EARTH_EQUATORIAL
+  const slantRef = Math.sqrt((rE + avgAlt) * (rE + avgAlt) - (rE * Math.cos(elRad)) * (rE * Math.cos(elRad))) - rE * Math.sin(elRad)
+  const fsplRef = 20 * Math.log10(4 * Math.PI * slantRef * 1000 / wavelengthM)
+  const atmLossRef = atmosphericLoss(freqMHz, elRef)
+
+  const passEquations: Equation[] = [
+    {
+      name: 'Free Space Path Loss',
+      formula: 'FSPL = 20 \u00D7 log\u2081\u2080(4\u03C0d/\u03BB) dB',
+      computed: selectedLinkResult
+        ? `FSPL = ${selectedLinkResult.fsplDb.toFixed(1)} dB  (d=${selectedLinkResult.slantRangeKm.toFixed(0)} km, f=${freqMHz} MHz)`
+        : `FSPL = ${fsplRef.toFixed(1)} dB  (at 10\u00B0 el, d=${slantRef.toFixed(0)} km, f=${freqMHz} MHz)`,
+    },
+    {
+      name: 'Slant Range',
+      formula: 'd = \u221A((R\u2091+h)\u00B2 - (R\u2091\u00D7cos(el))\u00B2) - R\u2091\u00D7sin(el)',
+      computed: selectedLinkResult
+        ? `d = ${selectedLinkResult.slantRangeKm.toFixed(0)} km  (h=${avgAlt.toFixed(0)} km, el=${selectedPass?.maxElevation.toFixed(1)}\u00B0)`
+        : `d = ${slantRef.toFixed(0)} km  (h=${avgAlt.toFixed(0)} km, el=10\u00B0)`,
+    },
+    {
+      name: 'EIRP',
+      formula: 'EIRP = P_tx + G_tx (dBW)',
+      computed: `EIRP = ${txPowerDbw.toFixed(1)} + ${commConfig.satAntennaGainDbi.toFixed(1)} = ${eirpDbw.toFixed(1)} dBW  (P_tx=${commConfig.txPowerW} W)`,
+    },
+    {
+      name: 'Link Margin',
+      formula: 'C/N\u2080 = EIRP - FSPL - L_atm + G/T + 228.6',
+      computed: selectedLinkResult
+        ? `C/N\u2080 = ${selectedLinkResult.cn0Dbhz.toFixed(1)} dB-Hz, Margin = ${selectedLinkResult.linkMarginDb.toFixed(1)} dB`
+        : undefined,
+      description: 'Select a pass to see computed link margin.',
+    },
+    {
+      name: 'Atmospheric Loss',
+      formula: 'L_atm = L_zenith / sin(el)',
+      computed: selectedLinkResult
+        ? `L_atm = ${selectedLinkResult.atmosphericLossDb.toFixed(1)} dB  (${commConfig.frequencyBand} at ${selectedPass?.maxElevation.toFixed(1)}\u00B0)`
+        : `L_atm = ${atmLossRef.toFixed(1)} dB  (${commConfig.frequencyBand} at 10\u00B0 el)`,
+    },
+  ]
 
   return (
     <div className="space-y-3">

@@ -8,6 +8,7 @@ interface Variable {
 export interface Equation {
   name: string
   formula: string
+  computed?: string
   description?: string
   variables?: Variable[]
 }
@@ -46,9 +47,14 @@ export default function EquationsPanel({ equations }: EquationsPanelProps) {
               <div className="text-[10px] font-semibold text-[var(--text-secondary)] uppercase tracking-wide">
                 {eq.name}
               </div>
-              <div className="font-mono text-[12px] text-accent-cyan leading-relaxed">
+              <div className="font-mono text-[12px] text-accent-cyan leading-relaxed whitespace-pre-line">
                 {eq.formula}
               </div>
+              {eq.computed && (
+                <div className="font-mono text-[11px] text-accent-green leading-relaxed whitespace-pre-line">
+                  {eq.computed}
+                </div>
+              )}
               {eq.description && (
                 <div className="text-[9px] text-[var(--text-tertiary)] leading-relaxed">
                   {eq.description}
