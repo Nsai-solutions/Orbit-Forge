@@ -5,6 +5,34 @@ import MetricCard from '@/components/ui/MetricCard'
 import SectionHeader from '@/components/ui/SectionHeader'
 import { computeRadiationEnvironment } from '@/lib/radiation'
 import { R_EARTH_EQUATORIAL } from '@/lib/constants'
+import EquationsPanel from '@/components/ui/EquationsPanel'
+import type { Equation } from '@/components/ui/EquationsPanel'
+
+const radiationEquations: Equation[] = [
+  {
+    name: 'Total Ionizing Dose',
+    formula: 'TID = flux \u00D7 LET \u00D7 t_mission \u00D7 shielding_factor',
+    description: 'Dose rate depends on orbit altitude, inclination, and shielding thickness.',
+    variables: [
+      { symbol: 'flux', definition: 'particle flux (particles/cm\u00B2/s)' },
+      { symbol: 'LET', definition: 'linear energy transfer (MeV\u00B7cm\u00B2/g)' },
+      { symbol: 't_mission', definition: 'mission duration' },
+    ],
+  },
+  {
+    name: 'AP-8 Trapped Proton Model',
+    formula: 'Trapped proton flux model for radiation belts',
+    description: 'Peak flux in inner belt (1000\u20136000 km altitude). Models proton environment as function of altitude and magnetic field coordinates.',
+  },
+  {
+    name: 'Shielding Attenuation',
+    formula: 'dose = dose_unshielded \u00D7 e^(-t / \u03BB)',
+    variables: [
+      { symbol: 't', definition: 'shielding thickness (mm Al equivalent)' },
+      { symbol: '\u03BB', definition: 'attenuation length (material dependent)' },
+    ],
+  },
+]
 
 export default function RadiationDisplay() {
   const elements = useStore((s) => s.elements)
@@ -119,6 +147,8 @@ export default function RadiationDisplay() {
           ))}
         </div>
       </SectionHeader>
+
+      <EquationsPanel equations={radiationEquations} />
     </div>
   )
 }

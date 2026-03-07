@@ -5,7 +5,46 @@ import SectionHeader from '@/components/ui/SectionHeader'
 import { predictPasses, enrichPassesWithLinkBudget, computePassMetrics, computeContactGaps } from '@/lib/pass-prediction'
 import { computePassLinkBudget, atmosphericLoss } from '@/lib/link-budget'
 import { R_EARTH_EQUATORIAL } from '@/lib/constants'
+import EquationsPanel from '@/components/ui/EquationsPanel'
+import type { Equation } from '@/components/ui/EquationsPanel'
 import LinkBudgetSection from './LinkBudgetSection'
+
+const passEquations: Equation[] = [
+  {
+    name: 'Free Space Path Loss',
+    formula: 'FSPL = 20 \u00D7 log\u2081\u2080(4\u03C0d/\u03BB) dB',
+    variables: [
+      { symbol: 'd', definition: 'slant range (m)' },
+      { symbol: '\u03BB', definition: 'wavelength (m) = c/f' },
+    ],
+  },
+  {
+    name: 'Slant Range',
+    formula: 'd = \u221A((R\u2091+h)\u00B2 - (R\u2091\u00D7cos(el))\u00B2) - R\u2091\u00D7sin(el)',
+    variables: [
+      { symbol: 'h', definition: 'orbital altitude (km)' },
+      { symbol: 'el', definition: 'elevation angle' },
+    ],
+  },
+  {
+    name: 'EIRP',
+    formula: 'EIRP = P_tx + G_tx (dBW)',
+    variables: [
+      { symbol: 'P_tx', definition: 'transmit power (dBW)' },
+      { symbol: 'G_tx', definition: 'transmit antenna gain (dBi)' },
+    ],
+  },
+  {
+    name: 'Link Margin',
+    formula: 'C/N\u2080 = EIRP - FSPL - L_atm - L_rain + G/T + 228.6',
+    description: 'Margin = C/N\u2080 - C/N\u2080_required (dB-Hz)',
+  },
+  {
+    name: 'Atmospheric Loss',
+    formula: 'L_atm = L_zenith / sin(el)',
+    description: 'Varies by frequency band: ~0.5 dB (UHF) to ~5 dB (Ka-band) at zenith.',
+  },
+]
 
 export default function PassDetailsDisplay() {
   const elements = useStore((s) => s.elements)
@@ -229,6 +268,8 @@ export default function PassDetailsDisplay() {
       </SectionHeader>
 
       <LinkBudgetSection />
+
+      <EquationsPanel equations={passEquations} />
     </div>
   )
 }

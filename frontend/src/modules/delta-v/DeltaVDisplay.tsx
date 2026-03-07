@@ -6,6 +6,47 @@ import SectionHeader from '@/components/ui/SectionHeader'
 import { computeDeltaVBudget } from '@/lib/delta-v'
 import { R_EARTH_EQUATORIAL } from '@/lib/constants'
 import { computeBallisticCoefficient } from '@/lib/orbital-lifetime'
+import EquationsPanel from '@/components/ui/EquationsPanel'
+import type { Equation } from '@/components/ui/EquationsPanel'
+
+const deltaVEquations: Equation[] = [
+  {
+    name: 'Vis-Viva Equation',
+    formula: 'v\u00B2 = \u03BC(2/r - 1/a)',
+    description: 'Relates velocity to position and orbit shape. Core equation for all maneuver calculations.',
+    variables: [
+      { symbol: '\u03BC', definition: 'gravitational parameter (km\u00B3/s\u00B2)' },
+      { symbol: 'r', definition: 'current orbital radius (km)' },
+      { symbol: 'a', definition: 'semi-major axis (km)' },
+    ],
+  },
+  {
+    name: 'Hohmann Transfer \u0394V',
+    formula: '\u0394V\u2081 = v_transfer_periapsis - v_circular\u2081\n\u0394V\u2082 = v_circular\u2082 - v_transfer_apoapsis',
+    variables: [
+      { symbol: 'a_transfer', definition: '(r\u2081 + r\u2082) / 2' },
+    ],
+  },
+  {
+    name: 'Plane Change \u0394V',
+    formula: '\u0394V = 2v \u00D7 sin(\u0394i/2)',
+    variables: [
+      { symbol: '\u0394i', definition: 'inclination change (radians)' },
+      { symbol: 'v', definition: 'orbital velocity at maneuver point' },
+    ],
+  },
+  {
+    name: 'Tsiolkovsky Rocket Equation',
+    formula: '\u0394V = I_sp \u00D7 g\u2080 \u00D7 ln(m\u2080/m_f)',
+    description: 'Rearranged: m_propellant = m\u2080 \u00D7 (1 - e^(-\u0394V/(I_sp\u00D7g\u2080)))',
+    variables: [
+      { symbol: 'I_sp', definition: 'specific impulse (s)' },
+      { symbol: 'g\u2080', definition: '9.80665 m/s\u00B2' },
+      { symbol: 'm\u2080', definition: 'initial (wet) mass' },
+      { symbol: 'm_f', definition: 'final (dry) mass' },
+    ],
+  },
+]
 
 export default function DeltaVDisplay() {
   const elements = useStore((s) => s.elements)
@@ -119,6 +160,8 @@ export default function DeltaVDisplay() {
           />
         </div>
       </SectionHeader>
+
+      <EquationsPanel equations={deltaVEquations} />
     </div>
   )
 }

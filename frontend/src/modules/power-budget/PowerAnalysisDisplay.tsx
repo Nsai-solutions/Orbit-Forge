@@ -4,7 +4,40 @@ import DataReadout from '@/components/ui/DataReadout'
 import MetricCard from '@/components/ui/MetricCard'
 import SectionHeader from '@/components/ui/SectionHeader'
 import { computePowerAnalysis } from '@/lib/power-budget'
+import EquationsPanel from '@/components/ui/EquationsPanel'
+import type { Equation } from '@/components/ui/EquationsPanel'
 import ThermalSection from './ThermalSection'
+
+const powerEquations: Equation[] = [
+  {
+    name: 'Eclipse Duration',
+    formula: '\u03B2 = arcsin(R\u2091 / (R\u2091 + h))',
+    description: 'Eclipse fraction \u2248 \u03B2/\u03C0 for circular orbit at 0\u00B0 beta angle. Eclipse duration = fraction \u00D7 period.',
+    variables: [
+      { symbol: 'R\u2091', definition: 'Earth equatorial radius (6378.137 km)' },
+      { symbol: 'h', definition: 'orbital altitude (km)' },
+    ],
+  },
+  {
+    name: 'Solar Power Generation',
+    formula: 'P = \u03B7 \u00D7 A_panel \u00D7 S \u00D7 cos(\u03B8)',
+    variables: [
+      { symbol: '\u03B7', definition: 'solar cell efficiency' },
+      { symbol: 'A_panel', definition: 'panel area (m\u00B2)' },
+      { symbol: 'S', definition: 'solar constant = 1361 W/m\u00B2' },
+      { symbol: '\u03B8', definition: 'sun incidence angle' },
+    ],
+  },
+  {
+    name: 'Battery Depth of Discharge',
+    formula: 'DOD = (P_load \u00D7 t_eclipse) / (C_battery \u00D7 V)',
+    variables: [
+      { symbol: 'P_load', definition: 'power consumption during eclipse (W)' },
+      { symbol: 't_eclipse', definition: 'eclipse duration (hours)' },
+      { symbol: 'C_battery', definition: 'battery capacity (Wh)' },
+    ],
+  },
+]
 
 export default function PowerAnalysisDisplay() {
   const elements = useStore((s) => s.elements)
@@ -110,6 +143,8 @@ export default function PowerAnalysisDisplay() {
       </SectionHeader>
 
       <ThermalSection />
+
+      <EquationsPanel equations={powerEquations} />
     </div>
   )
 }

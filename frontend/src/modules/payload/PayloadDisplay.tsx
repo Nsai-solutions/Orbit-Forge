@@ -7,6 +7,36 @@ import { computeEOAnalysis } from '@/lib/payload-eo'
 import { computeSARAnalysis } from '@/lib/payload-sar'
 import { computeSATCOMAnalysis } from '@/lib/payload-satcom'
 import { R_EARTH_EQUATORIAL } from '@/lib/constants'
+import EquationsPanel from '@/components/ui/EquationsPanel'
+import type { Equation } from '@/components/ui/EquationsPanel'
+
+const eoEquations: Equation[] = [
+  {
+    name: 'Ground Sample Distance',
+    formula: 'GSD = (pixel_size \u00D7 altitude) / focal_length',
+    variables: [
+      { symbol: 'pixel_size', definition: 'detector pixel pitch (m)' },
+      { symbol: 'altitude', definition: 'orbital altitude (m)' },
+      { symbol: 'focal_length', definition: 'lens focal length (m)' },
+    ],
+  },
+  {
+    name: 'Swath Width',
+    formula: 'Swath = 2 \u00D7 altitude \u00D7 tan(FOV/2)',
+    description: 'FOV = 2 \u00D7 arctan(n_pixels \u00D7 pixel_size / (2 \u00D7 focal_length))',
+  },
+  {
+    name: 'Signal-to-Noise Ratio',
+    formula: 'SNR = (L \u00D7 \u03C1 \u00D7 \u03C4_atm \u00D7 \u03C0 \u00D7 D\u00B2 \u00D7 t_int \u00D7 QE) / (4 \u00D7 f#\u00B2 \u00D7 NEP)',
+    description: 'Full radiometric chain from target radiance through optics to detector.',
+    variables: [
+      { symbol: 'L', definition: 'target radiance' },
+      { symbol: '\u03C1', definition: 'target reflectance' },
+      { symbol: 'D', definition: 'aperture diameter (m)' },
+      { symbol: 'QE', definition: 'detector quantum efficiency' },
+    ],
+  },
+]
 
 export default function PayloadDisplay() {
   const payloadType = useStore((s) => s.payloadType)
@@ -87,6 +117,8 @@ export default function PayloadDisplay() {
           </SectionHeader>
         </>
       )}
+
+      {eoAnalysis && <EquationsPanel equations={eoEquations} />}
 
       {/* ─── SAR Display ─── */}
       {sarAnalysis && (

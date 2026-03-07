@@ -14,8 +14,47 @@ import {
 } from '@/lib/units'
 import DataReadout from '@/components/ui/DataReadout'
 import SectionHeader from '@/components/ui/SectionHeader'
+import EquationsPanel from '@/components/ui/EquationsPanel'
+import type { Equation } from '@/components/ui/EquationsPanel'
 import ExportCSVButton from '@/components/ui/ExportCSVButton'
 import { exportCSV } from '@/lib/csv-export'
+
+const orbitEquations: Equation[] = [
+  {
+    name: 'Orbital Velocity (Circular)',
+    formula: 'v = \u221A(\u03BC/r)',
+    variables: [
+      { symbol: '\u03BC', definition: 'Earth gravitational parameter = 398,600.4418 km\u00B3/s\u00B2' },
+      { symbol: 'r', definition: 'R\u2091 + altitude (km)' },
+    ],
+  },
+  {
+    name: 'Orbital Period',
+    formula: 'T = 2\u03C0\u221A(a\u00B3/\u03BC)',
+    variables: [
+      { symbol: 'a', definition: 'semi-major axis (km)' },
+    ],
+  },
+  {
+    name: 'J2 RAAN Drift',
+    formula: 'd\u03A9/dt = -3/2 \u00D7 n \u00D7 J\u2082 \u00D7 (R\u2091/a)\u00B2 \u00D7 cos(i) / (1-e\u00B2)\u00B2',
+    variables: [
+      { symbol: 'n', definition: 'mean motion (rad/s)' },
+      { symbol: 'J\u2082', definition: '1.08263\u00D710\u207B\u00B3' },
+      { symbol: 'i', definition: 'inclination' },
+      { symbol: 'e', definition: 'eccentricity' },
+    ],
+  },
+  {
+    name: 'J2 Arg. Perigee Drift',
+    formula: 'd\u03C9/dt = 3/2 \u00D7 n \u00D7 J\u2082 \u00D7 (R\u2091/a)\u00B2 \u00D7 (2 - 5/2 \u00D7 sin\u00B2(i)) / (1-e\u00B2)\u00B2',
+  },
+  {
+    name: 'Sun-Synchronous Condition',
+    formula: 'd\u03A9/dt = 0.9856\u00B0/day',
+    description: 'Solve RAAN drift equation for inclination at a given altitude to achieve sun-synchronous precession matching Earth\u2019s orbital rate.',
+  },
+]
 
 export default function OrbitalParamsDisplay() {
   const derivedParams = useStore((s) => s.derivedParams)
@@ -166,6 +205,8 @@ export default function OrbitalParamsDisplay() {
           />
         </div>
       </SectionHeader>
+
+      <EquationsPanel equations={orbitEquations} />
 
       {/* Raw Elements */}
       <SectionHeader title={isNumerical ? 'Osculating Elements' : 'Classical Elements'} defaultOpen={false}>

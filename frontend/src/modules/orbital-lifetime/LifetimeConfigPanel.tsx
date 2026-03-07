@@ -7,6 +7,44 @@ import {
   checkCompliance,
   type SolarActivity,
 } from '@/lib/orbital-lifetime'
+import EquationsPanel from '@/components/ui/EquationsPanel'
+import type { Equation } from '@/components/ui/EquationsPanel'
+
+const lifetimeEquations: Equation[] = [
+  {
+    name: 'Atmospheric Drag Acceleration',
+    formula: 'a_drag = -\u00BD \u00D7 C\u1D48 \u00D7 (A/m) \u00D7 \u03C1 \u00D7 v\u00B2 \u00D7 v\u0302',
+    variables: [
+      { symbol: 'C\u1D48', definition: 'drag coefficient' },
+      { symbol: 'A/m', definition: 'area-to-mass ratio (m\u00B2/kg)' },
+      { symbol: '\u03C1', definition: 'atmospheric density (kg/m\u00B3)' },
+      { symbol: 'v', definition: 'velocity relative to atmosphere' },
+    ],
+  },
+  {
+    name: 'Ballistic Coefficient',
+    formula: 'B* = C\u1D48 \u00D7 A / m',
+    variables: [
+      { symbol: 'A', definition: 'cross-sectional area (m\u00B2)' },
+      { symbol: 'm', definition: 'spacecraft mass (kg)' },
+    ],
+  },
+  {
+    name: 'Atmospheric Density Model',
+    formula: 'NRLMSISE-00',
+    description: 'Empirical model using altitude, latitude, longitude, date, F10.7 solar flux, and Ap geomagnetic index. Density varies 5\u201310\u00D7 between solar minimum (F10.7\u224870) and solar maximum (F10.7\u2248200) at 500 km.',
+  },
+  {
+    name: 'Orbital Decay Rate',
+    formula: 'da/dt = -\u03C1 \u00D7 v \u00D7 C\u1D48 \u00D7 A / m',
+    description: 'Altitude loss per orbit increases as the orbit decays (density increases exponentially with decreasing altitude).',
+  },
+  {
+    name: 'De-orbit Delta-V',
+    formula: '\u0394V = v_circular - v_transfer',
+    description: 'Hohmann transfer to lower perigee to 80 km for atmospheric re-entry.',
+  },
+]
 
 export default function LifetimeConfigPanel() {
   const elements = useStore((s) => s.elements)
@@ -95,6 +133,7 @@ export default function LifetimeConfigPanel() {
           </p>
         </div>
       </SectionHeader>
+      <EquationsPanel equations={lifetimeEquations} />
     </div>
   )
 }
