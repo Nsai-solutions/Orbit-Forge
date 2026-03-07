@@ -36,9 +36,9 @@ export default function LifetimeConfigPanel() {
               onChange={(e) => updateMission({ solarActivity: e.target.value as SolarActivity })}
               className="input-field w-24 text-xs"
             >
-              <option value="low">Low (F10.7=70)</option>
-              <option value="moderate">Moderate (140)</option>
-              <option value="high">High (250)</option>
+              <option value="low">Low (F10.7=70, Ap=4)</option>
+              <option value="moderate">Moderate (F10.7=140, Ap=15)</option>
+              <option value="high">High (F10.7=200, Ap=30)</option>
             </select>
           </label>
           <div className="flex items-center justify-between text-[10px]">

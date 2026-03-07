@@ -7,7 +7,7 @@ import {
   computeDeorbitDeltaV,
   type SolarActivity,
 } from '@/lib/orbital-lifetime'
-import { getAtmosphericDensity } from '@/lib/constants'
+import { getNrlmsiseDensity, SOLAR_PRESETS } from '@/lib/nrlmsise00'
 
 export default function LifetimeDisplay() {
   const elements = useStore((s) => s.elements)
@@ -21,7 +21,8 @@ export default function LifetimeDisplay() {
 
   const lifetimeDays = estimateLifetime(avgAlt, bStar, solarActivity)
   const deorbitDV = computeDeorbitDeltaV(avgAlt)
-  const density = getAtmosphericDensity(avgAlt)
+  const preset = SOLAR_PRESETS[solarActivity]
+  const density = getNrlmsiseDensity(avgAlt, 0, 0, new Date(), preset.f107a, preset.f107, preset.ap)
 
   return (
     <div className="space-y-3">

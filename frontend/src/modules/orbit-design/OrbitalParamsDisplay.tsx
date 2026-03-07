@@ -1,6 +1,8 @@
 import { useStore } from '@/stores'
 import { classifyOrbit } from '@/types/orbit'
-import { R_EARTH_EQUATORIAL, MU_EARTH_KM, getAtmosphericDensity } from '@/lib/constants'
+import { R_EARTH_EQUATORIAL, MU_EARTH_KM } from '@/lib/constants'
+import { getNrlmsiseDensity, SOLAR_PRESETS } from '@/lib/nrlmsise00'
+import type { SolarActivity } from '@/lib/orbital-lifetime'
 import {
   formatDistance,
   formatVelocity,
@@ -20,6 +22,7 @@ export default function OrbitalParamsDisplay() {
   const elements = useStore((s) => s.elements)
   const propagationMode = useStore((s) => s.propagationMode)
   const osculatingElements = useStore((s) => s.osculatingElements)
+  const solarActivity = (useStore((s) => s.mission.solarActivity) || 'moderate') as SolarActivity
 
   if (!derivedParams) {
     return (
@@ -51,7 +54,8 @@ export default function OrbitalParamsDisplay() {
 
   const avgAlt = (periapsisAlt + apoapsisAlt) / 2
   const orbitType = classifyOrbit(avgAlt, ecc, displayElements.inclination, derivedParams.raanDrift)
-  const atmDensity = getAtmosphericDensity(periapsisAlt)
+  const solarPreset = SOLAR_PRESETS[solarActivity]
+  const atmDensity = getNrlmsiseDensity(periapsisAlt, 0, 0, new Date(), solarPreset.f107a, solarPreset.f107, solarPreset.ap)
 
   return (
     <div className="space-y-3">

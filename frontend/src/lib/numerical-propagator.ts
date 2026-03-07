@@ -16,7 +16,9 @@ import {
 } from './constants'
 import { MU_MOON, MU_SUN, AU_KM } from './beyond-leo-constants'
 import { dateToJulianCenturies } from './time-utils'
-import { keplerianToCartesian } from './coordinate-transforms'
+import { keplerianToCartesian, eciToEcef, ecefToGeodetic } from './coordinate-transforms'
+import { dateToGMST } from './time-utils'
+import { getNrlmsiseDensity } from './nrlmsise00'
 import type { OrbitalElements } from '@/types/orbit'
 import type { Vec3 } from '@/types'
 
@@ -55,6 +57,13 @@ export interface SpacecraftProps {
   cr: number    // SRP reflectivity coefficient (typ. 1.2)
   area: number  // cross-section area m^2
   mass: number  // kg
+}
+
+export interface AtmosphereConfig {
+  f107a: number
+  f107: number
+  ap: number
+  useNrlmsise: boolean
 }
 
 export type PropagationMode = 'keplerian' | 'numerical-j2' | 'numerical-full'
@@ -177,11 +186,20 @@ function accelDrag(
   x: number, y: number, z: number,
   vx: number, vy: number, vz: number,
   rMag: number, sc: SpacecraftProps,
+  date?: Date, atmConfig?: AtmosphereConfig,
 ): Vec3 {
   const altKm = rMag - R_EARTH_EQUATORIAL
   if (altKm > 1000 || altKm < 0) return { x: 0, y: 0, z: 0 }
 
-  const rho = getAtmosphericDensity(altKm)
+  let rho: number
+  if (atmConfig?.useNrlmsise && date) {
+    const gmst = dateToGMST(date)
+    const ecef = eciToEcef({ x, y, z }, gmst)
+    const geo = ecefToGeodetic(ecef)
+    rho = getNrlmsiseDensity(altKm, geo.lat, geo.lon, date, atmConfig.f107a, atmConfig.f107, atmConfig.ap)
+  } else {
+    rho = getAtmosphericDensity(altKm)
+  }
   if (rho <= 0) return { x: 0, y: 0, z: 0 }
 
   // Velocity relative to rotating atmosphere
@@ -351,6 +369,8 @@ function totalAcceleration(
   sc: SpacecraftProps,
   sunPos: Vec3 | null,
   moonPos: Vec3 | null,
+  date?: Date,
+  atmConfig?: AtmosphereConfig,
 ): Vec3 {
   const rMag = Math.sqrt(x * x + y * y + z * z)
 
@@ -370,7 +390,7 @@ function totalAcceleration(
   }
 
   if (config.drag) {
-    const a = accelDrag(x, y, z, vx, vy, vz, rMag, sc)
+    const a = accelDrag(x, y, z, vx, vy, vz, rMag, sc, date, atmConfig)
     ax += a.x; ay += a.y; az += a.z
   }
 
@@ -404,6 +424,7 @@ function rk4Step3D(
   dtSec: number,
   config: PerturbationConfig,
   sc: SpacecraftProps,
+  atmConfig?: AtmosphereConfig,
 ): StateVector {
   // Compute Sun/Moon positions once per step (they barely move in 30s)
   const date = new Date(tMs)
@@ -411,7 +432,7 @@ function rk4Step3D(
   const moonPos = config.thirdBodyMoon ? computeMoonPositionECI(date) : null
 
   function deriv(sx: number, sy: number, sz: number, svx: number, svy: number, svz: number) {
-    const a = totalAcceleration(sx, sy, sz, svx, svy, svz, config, sc, sunPos, moonPos)
+    const a = totalAcceleration(sx, sy, sz, svx, svy, svz, config, sc, sunPos, moonPos, date, atmConfig)
     return { dx: svx, dy: svy, dz: svz, dvx: a.x, dvy: a.y, dvz: a.z }
   }
 
@@ -456,6 +477,7 @@ export function propagateNumerical(
   dtSec: number,
   config: PerturbationConfig,
   sc: SpacecraftProps,
+  atmConfig?: AtmosphereConfig,
 ): TrajectoryPoint[] {
   // Convert elements to state vector using existing utility
   const { position, velocity } = keplerianToCartesian(elements, MU_EARTH_KM)
@@ -482,7 +504,7 @@ export function propagateNumerical(
 
   let tMs = epochMs
   for (let i = 0; i < effectiveNumSteps; i++) {
-    state = rk4Step3D(state, tMs, effectiveDt, config, sc)
+    state = rk4Step3D(state, tMs, effectiveDt, config, sc, atmConfig)
     tMs += effectiveDt * 1000
     trajectory.push({ t: tMs, state: { ...state } })
   }

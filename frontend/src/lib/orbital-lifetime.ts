@@ -1,4 +1,5 @@
-import { R_EARTH_EQUATORIAL, MU_EARTH_KM, getAtmosphericDensity } from './constants'
+import { R_EARTH_EQUATORIAL, MU_EARTH_KM } from './constants'
+import { getNrlmsiseDensity, SOLAR_PRESETS } from './nrlmsise00'
 
 /**
  * Solar activity levels and corresponding F10.7 indices
@@ -67,8 +68,9 @@ function decayRate(
   const r = R_EARTH_EQUATORIAL + altitudeKm // km
   const v = Math.sqrt(MU_EARTH_KM / r)  // km/s
 
-  // Get atmospheric density (kg/m^3) and apply solar multiplier
-  const rho = getAtmosphericDensity(altitudeKm) * solarActivityMultiplier(solarActivity)
+  // Get atmospheric density (kg/m^3) from NRLMSISE-00
+  const preset = SOLAR_PRESETS[solarActivity]
+  const rho = getNrlmsiseDensity(altitudeKm, 0, 0, new Date(), preset.f107a, preset.f107, preset.ap)
 
   // Convert rho from kg/m^3 to kg/km^3 for consistent units
   const rhoKm = rho * 1e9
