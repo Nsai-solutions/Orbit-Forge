@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useMemo } from 'react'
 import { useStore } from '@/stores'
 import SectionHeader from '@/components/ui/SectionHeader'
 import MetricCard from '@/components/ui/MetricCard'
@@ -11,8 +11,9 @@ import {
 export default function LifetimeConfigPanel() {
   const elements = useStore((s) => s.elements)
   const mission = useStore((s) => s.mission)
+  const updateMission = useStore((s) => s.updateMission)
 
-  const [solarActivity, setSolarActivity] = useState<SolarActivity>('moderate')
+  const solarActivity = mission.solarActivity as SolarActivity
 
   const avgAlt = elements.semiMajorAxis - 6378.137
   const crossSection = mission.spacecraft.crossSectionArea
@@ -32,7 +33,7 @@ export default function LifetimeConfigPanel() {
             <span className="text-[10px] text-[var(--text-secondary)]">Solar Activity</span>
             <select
               value={solarActivity}
-              onChange={(e) => setSolarActivity(e.target.value as SolarActivity)}
+              onChange={(e) => updateMission({ solarActivity: e.target.value as SolarActivity })}
               className="input-field w-24 text-xs"
             >
               <option value="low">Low (F10.7=70)</option>

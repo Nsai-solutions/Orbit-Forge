@@ -58,11 +58,14 @@ export interface SpacecraftConfig {
   frequencyBand: FrequencyBand
 }
 
+export type SolarActivityLevel = 'low' | 'moderate' | 'high'
+
 export interface MissionConfig {
   name: string
   epoch: Date
   missionType: MissionType
   lifetimeTarget: number     // years
+  solarActivity: SolarActivityLevel
   spacecraft: SpacecraftConfig
 }
 
@@ -91,5 +94,6 @@ export const DEFAULT_MISSION: MissionConfig = {
   epoch: new Date(),
   missionType: 'earth-observation',
   lifetimeTarget: 2,
+  solarActivity: 'moderate',
   spacecraft: DEFAULT_SPACECRAFT,
 }

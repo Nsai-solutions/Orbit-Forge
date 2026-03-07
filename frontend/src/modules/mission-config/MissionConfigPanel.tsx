@@ -85,33 +85,30 @@ export default function MissionConfigPanel() {
 
       {/* Bus Type */}
       <SectionHeader title="Spacecraft" defaultOpen={true}>
-        <label className="text-[11px] uppercase tracking-wider text-[var(--text-tertiary)] font-sans">
-          Bus Type
-        </label>
-        <div className="grid grid-cols-4 gap-1.5 mt-1">
-          {(Object.entries(CUBESAT_SIZES) as [CubeSatSize, typeof CUBESAT_SIZES['1U']][]).map(([key, spec]) => (
-            <button
-              key={key}
-              onClick={() => {
-                updateSpacecraft({
-                  size: key as CubeSatSize,
-                  mass: spec.typicalMass.max,
-                  crossSectionArea: spec.typicalCrossSection,
-                  solarPanelArea: spec.typicalPanelArea,
-                })
-              }}
-              className={`
-                p-2 rounded border text-center transition-all
-                ${sc.size === key
-                  ? 'border-accent-blue/50 bg-accent-blue/10 text-accent-blue'
-                  : 'border-white/10 text-[var(--text-secondary)] hover:border-white/20'}
-              `}
-            >
-              <div className="text-sm font-mono font-bold">{key}</div>
-              <div className="text-[9px] text-[var(--text-tertiary)]">{spec.dimensions}</div>
-            </button>
-          ))}
-        </div>
+        <SelectField
+          label="Bus Type"
+          value={sc.size}
+          onChange={(v) => {
+            const size = v as CubeSatSize
+            const spec = CUBESAT_SIZES[size]
+            updateSpacecraft({
+              size,
+              mass: spec.typicalMass.max,
+              crossSectionArea: spec.typicalCrossSection,
+              solarPanelArea: spec.typicalPanelArea,
+            })
+          }}
+          options={[
+            { label: '1U (10×10×10 cm)', value: '1U' },
+            { label: '1.5U (10×10×15 cm)', value: '1.5U' },
+            { label: '2U (10×10×20 cm)', value: '2U' },
+            { label: '3U (10×10×30 cm)', value: '3U' },
+            { label: '6U (20×10×30 cm)', value: '6U' },
+            { label: '12U (20×20×30 cm)', value: '12U' },
+            { label: 'SmallSat', value: 'SmallSat' },
+            { label: 'Custom', value: 'Custom' },
+          ]}
+        />
 
         <NumberField label="Mass" value={sc.mass} onChange={(v) => updateSpacecraft({ mass: v })} unit="kg" min={0.1} max={1000} step={0.1} />
         <NumberField label="Cross-Section Area" value={sc.crossSectionArea} onChange={(v) => updateSpacecraft({ crossSectionArea: v })} unit="m²" min={0.001} max={20} step={0.001} />

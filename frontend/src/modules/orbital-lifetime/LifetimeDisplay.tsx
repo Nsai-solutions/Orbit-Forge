@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import { useStore } from '@/stores'
 import DataReadout from '@/components/ui/DataReadout'
 import SectionHeader from '@/components/ui/SectionHeader'
@@ -13,7 +13,7 @@ import { getAtmosphericDensity } from '@/lib/constants'
 export default function LifetimeDisplay() {
   const elements = useStore((s) => s.elements)
   const mission = useStore((s) => s.mission)
-  const [solarActivity] = useState<SolarActivity>('moderate')
+  const solarActivity = mission.solarActivity as SolarActivity
 
   const avgAlt = elements.semiMajorAxis - 6378.137
   const crossSection = mission.spacecraft.crossSectionArea

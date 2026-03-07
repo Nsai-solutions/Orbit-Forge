@@ -40,7 +40,7 @@ export const useStore = create<AppStore>()(
       }),
       {
         name: 'orbitforge-autosave',
-        version: 17,
+        version: 18,
         migrate: (persisted: any, version: number) => {
           if (version < 8) {
             const { groundStations, ...rest } = persisted || {}
@@ -92,6 +92,15 @@ export const useStore = create<AppStore>()(
           // v17: Comm slice fields are new; defaults applied by slice initializer
           if (version < 17) {
             // No migration needed — new slice fields get defaults
+          }
+          // v18: Add solarActivity to mission config
+          if (version < 18) {
+            if (persisted?.mission && !persisted.mission.solarActivity) {
+              persisted = {
+                ...persisted,
+                mission: { ...persisted.mission, solarActivity: 'moderate' },
+              }
+            }
           }
           return persisted as any
         },
