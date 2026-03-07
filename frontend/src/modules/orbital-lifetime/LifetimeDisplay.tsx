@@ -1,4 +1,3 @@
-import { useMemo } from 'react'
 import { useStore } from '@/stores'
 import DataReadout from '@/components/ui/DataReadout'
 import SectionHeader from '@/components/ui/SectionHeader'
@@ -13,23 +12,15 @@ import { getAtmosphericDensity } from '@/lib/constants'
 export default function LifetimeDisplay() {
   const elements = useStore((s) => s.elements)
   const mission = useStore((s) => s.mission)
-  const solarActivity = mission.solarActivity as SolarActivity
+  const solarActivity = (useStore((s) => s.mission.solarActivity) || 'moderate') as SolarActivity
 
   const avgAlt = elements.semiMajorAxis - 6378.137
   const crossSection = mission.spacecraft.crossSectionArea
   const cd = mission.spacecraft.dragCoefficient
   const bStar = computeBallisticCoefficient(mission.spacecraft.mass, crossSection, cd)
 
-  const lifetimeDays = useMemo(
-    () => estimateLifetime(avgAlt, bStar, solarActivity),
-    [avgAlt, bStar, solarActivity]
-  )
-
-  const deorbitDV = useMemo(
-    () => computeDeorbitDeltaV(avgAlt),
-    [avgAlt]
-  )
-
+  const lifetimeDays = estimateLifetime(avgAlt, bStar, solarActivity)
+  const deorbitDV = computeDeorbitDeltaV(avgAlt)
   const density = getAtmosphericDensity(avgAlt)
 
   return (
