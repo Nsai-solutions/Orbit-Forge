@@ -209,8 +209,6 @@ export default function OrbitalParamsDisplay() {
         </div>
       </SectionHeader>
 
-      <EquationsPanel equations={orbitEquations} />
-
       {/* Raw Elements */}
       <SectionHeader title={isNumerical ? 'Osculating Elements' : 'Classical Elements'} defaultOpen={false}>
         <div className="grid grid-cols-1 gap-2">
@@ -222,6 +220,8 @@ export default function OrbitalParamsDisplay() {
           <DataReadout label="True Anomaly" value={formatAngle(displayElements.trueAnomaly)} />
         </div>
       </SectionHeader>
+
+      <EquationsPanel equations={orbitEquations} />
     </div>
   )
 }

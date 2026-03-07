@@ -114,8 +114,6 @@ export default function PayloadDisplay() {
         </>
       )}
 
-      {eoAnalysis && <EquationsPanel equations={eoEquations} />}
-
       {/* ─── SAR Display ─── */}
       {sarAnalysis && (
         <>
@@ -178,6 +176,8 @@ export default function PayloadDisplay() {
           </SectionHeader>
         </>
       )}
+
+      {eoAnalysis && <EquationsPanel equations={eoEquations} />}
     </div>
   )
 }
