@@ -15,6 +15,7 @@ import GroundStationMarkers from './GroundStationMarker'
 import StationVisibilityCones from './StationVisibilityCone'
 import PayloadFootprint from './PayloadFootprint'
 import SwathCorridor from './SwathCorridor'
+import EOTargetMarkers from './EOTargetMarker'
 import SimulationClock from './SimulationClock'
 import { usePropagationSync } from '@/hooks/usePropagationSync'
 
@@ -81,6 +82,7 @@ export default function EarthScene() {
       <StationVisibilityCones />
       <PayloadFootprint />
       <SwathCorridor />
+      <EOTargetMarkers />
 
       <AdaptiveControls />
     </>

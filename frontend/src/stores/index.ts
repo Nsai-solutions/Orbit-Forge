@@ -15,8 +15,9 @@ import { ArchitectSlice, createArchitectSlice } from './architect-slice'
 import { SimulationSlice, createSimulationSlice } from './simulation-slice'
 import { PropagationSlice, createPropagationSlice } from './propagation-slice'
 import { CommSlice, createCommSlice } from './comm-slice'
+import { EOPlanningSlice, createEOPlanningSlice } from './eo-planning-slice'
 
-export type AppStore = UISlice & MissionSlice & OrbitSlice & GroundSlice & PowerSlice & ConstellationSlice & DeltaVSlice & RadiationSlice & ComparisonSlice & PayloadSlice & BeyondLeoSlice & ArchitectSlice & SimulationSlice & PropagationSlice & CommSlice
+export type AppStore = UISlice & MissionSlice & OrbitSlice & GroundSlice & PowerSlice & ConstellationSlice & DeltaVSlice & RadiationSlice & ComparisonSlice & PayloadSlice & BeyondLeoSlice & ArchitectSlice & SimulationSlice & PropagationSlice & CommSlice & EOPlanningSlice
 
 export const useStore = create<AppStore>()(
   devtools(
@@ -37,10 +38,11 @@ export const useStore = create<AppStore>()(
         ...createSimulationSlice(...a),
         ...createPropagationSlice(...a),
         ...createCommSlice(...a),
+        ...createEOPlanningSlice(...a),
       }),
       {
         name: 'orbitforge-autosave',
-        version: 18,
+        version: 19,
         migrate: (persisted: any, version: number) => {
           if (version < 8) {
             const { groundStations, ...rest } = persisted || {}
@@ -146,6 +148,7 @@ export const useStore = create<AppStore>()(
           spacecraftProps: state.spacecraftProps,
           numOrbits: state.numOrbits,
           commConfig: state.commConfig,
+          eoTargets: state.eoTargets,
           mission: {
             ...state.mission,
             epoch: state.mission.epoch instanceof Date

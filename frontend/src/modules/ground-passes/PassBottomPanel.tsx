@@ -4,6 +4,7 @@ import LinkBudgetChart from './LinkBudgetChart'
 import SkyPlotChart from './SkyPlotChart'
 import ContactTimelineChart from './ContactTimelineChart'
 import LinkBudgetWaterfallChart from './LinkBudgetWaterfallChart'
+import EOPlanningChart from './EOPlanningChart'
 
 const TABS = [
   { id: 'timeline', label: 'Pass Timeline' },
@@ -11,6 +12,7 @@ const TABS = [
   { id: 'waterfall', label: 'Link Waterfall' },
   { id: 'link', label: 'Link vs Elevation' },
   { id: 'skyplot', label: 'Sky Plot' },
+  { id: 'eo-planning', label: 'EO Planning' },
 ] as const
 
 type TabId = (typeof TABS)[number]['id']
@@ -46,6 +48,7 @@ export default function PassBottomPanel() {
         {activeTab === 'waterfall' && <LinkBudgetWaterfallChart />}
         {activeTab === 'link' && <LinkBudgetChart />}
         {activeTab === 'skyplot' && <SkyPlotChart />}
+        {activeTab === 'eo-planning' && <EOPlanningChart />}
       </div>
     </div>
   )

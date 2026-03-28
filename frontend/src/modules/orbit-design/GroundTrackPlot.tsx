@@ -8,6 +8,8 @@ export default function GroundTrackPlot() {
   const orbitEpoch = useStore((s) => s.orbitEpoch)
   const groundStations = useStore((s) => s.groundStations)
   const activeStations = groundStations.filter((gs) => gs.active)
+  const eoTargets = useStore((s) => s.eoTargets)
+  const activeTargets = eoTargets.filter((t) => t.active)
 
   const traces = useMemo(() => {
     const track = computeGroundTrack(elements, orbitEpoch, 10, 180)
@@ -53,8 +55,24 @@ export default function GroundTrackPlot() {
       })
     }
 
+    // EO Targets
+    if (activeTargets.length > 0) {
+      result.push({
+        type: 'scattergeo',
+        lat: activeTargets.map((t) => t.lat),
+        lon: activeTargets.map((t) => t.lon),
+        text: activeTargets.map((t) => t.name),
+        mode: 'markers+text',
+        marker: { color: '#F59E0B', size: 8, symbol: 'diamond' },
+        textposition: 'top center',
+        textfont: { size: 9, color: '#F59E0B', family: 'JetBrains Mono' },
+        name: 'EO Targets',
+        hoverinfo: 'text',
+      })
+    }
+
     return result
-  }, [elements, activeStations, orbitEpoch])
+  }, [elements, activeStations, activeTargets, orbitEpoch])
 
   // Dynamic satellite marker driven by 3D animation
   const satSubPoint = useStore((s) => s.satSubPoint)

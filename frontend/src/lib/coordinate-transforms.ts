@@ -140,6 +140,17 @@ export function geodeticToThreeJS(lat: number, lon: number, radius = 1): Vec3 {
 }
 
 /**
+ * Convert Three.js coordinates (unit sphere) back to geodetic lat/lon
+ * Inverse of geodeticToThreeJS
+ */
+export function threeJSToGeodetic(x: number, y: number, z: number): { lat: number; lon: number } {
+  const r = Math.sqrt(x * x + y * y + z * z)
+  const lat = Math.asin(y / r) * RAD2DEG
+  const lon = Math.atan2(-z, x) * RAD2DEG
+  return { lat, lon }
+}
+
+/**
  * Convert ECI position to Three.js coordinates (unit: Earth radii)
  * ECI: x=vernal equinox, y=90deg east, z=north pole
  * Three.js: x=right, y=up, z=toward camera

@@ -175,7 +175,7 @@ export default function Earth() {
   return (
     <group>
       {/* Main Earth sphere */}
-      <mesh ref={earthRef}>
+      <mesh ref={earthRef} name="earth-globe">
         <sphereGeometry args={[1, 48, 48]} />
         <earthMaterial
           dayTexture={textures.day}

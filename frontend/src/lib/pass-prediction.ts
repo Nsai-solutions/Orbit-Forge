@@ -29,7 +29,7 @@ export interface SatellitePass {
 /**
  * Compute satellite ECI position at a given time offset from epoch
  */
-function getPositionAtTime(
+export function getPositionAtTime(
   elements: OrbitalElements,
   epoch: Date,
   dtSec: number,

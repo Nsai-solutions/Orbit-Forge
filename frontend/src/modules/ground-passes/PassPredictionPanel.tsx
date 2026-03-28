@@ -7,6 +7,7 @@ import { predictPasses, enrichPassesWithLinkBudget, computePassMetrics } from '@
 import { exportCSV } from '@/lib/csv-export'
 import { R_EARTH_EQUATORIAL } from '@/lib/constants'
 import CommConfigSection from './CommConfigSection'
+import EOTargetSection from './EOTargetSection'
 
 type SortField = 'time' | 'duration' | 'elevation' | 'margin' | 'data'
 type SortDir = 'asc' | 'desc'
@@ -136,6 +137,8 @@ export default function PassPredictionPanel() {
       </SectionHeader>
 
       <CommConfigSection />
+
+      <EOTargetSection />
 
       <SectionHeader title="Contact Metrics">
         <div className="grid grid-cols-2 gap-2">
