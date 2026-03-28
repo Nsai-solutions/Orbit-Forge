@@ -39,6 +39,7 @@ export default function LifetimeDisplay() {
       name: 'Atmospheric Drag Acceleration',
       formula: 'a_drag = -\u00BD \u00D7 C\u1D48 \u00D7 (A/m) \u00D7 \u03C1 \u00D7 v\u00B2 \u00D7 v\u0302',
       computed: `C\u1D48=${cd.toFixed(1)}, A/m=${areaToMass.toFixed(4)} m\u00B2/kg, \u03C1=${density.toExponential(2)} kg/m\u00B3, v=${vCirc.toFixed(3)} km/s`,
+      reference: 'Montenbruck & Gill, Satellite Orbits, Ch. 3.5',
       variables: [
         { symbol: 'C\u1D48', definition: `${cd.toFixed(1)} (drag coefficient)` },
         { symbol: 'A/m', definition: `${crossSection.toFixed(4)} / ${mass.toFixed(1)} = ${areaToMass.toFixed(4)} m\u00B2/kg` },
@@ -48,24 +49,28 @@ export default function LifetimeDisplay() {
       name: 'Ballistic Coefficient',
       formula: 'B* = C\u1D48 \u00D7 A / m',
       computed: `B* = ${cd.toFixed(1)} \u00D7 ${crossSection.toFixed(4)} / ${mass.toFixed(1)} = ${bStar.toFixed(4)} m\u00B2/kg`,
+      reference: 'Montenbruck & Gill, Satellite Orbits, Ch. 3.5',
     },
     {
       name: 'Atmospheric Density (NRLMSISE-00)',
       formula: '\u03C1 = NRLMSISE-00(alt, lat, lon, date, F10.7, Ap)',
       computed: `\u03C1(${avgAlt.toFixed(1)} km, F10.7=${preset.f107}, Ap=${preset.ap}) = ${density.toExponential(3)} kg/m\u00B3`,
       description: 'Density varies 5\u201310\u00D7 between solar minimum (F10.7\u224870) and maximum (F10.7\u2248200) at 500 km.',
+      reference: 'Picone et al., NRLMSISE-00 empirical model of the atmosphere, J. Geophys. Res., 107(A12), 2002',
     },
     {
       name: 'Orbital Decay Rate',
       formula: 'da/dt = -\u03C1 \u00D7 v \u00D7 C\u1D48 \u00D7 A / m',
       computed: `Lifetime \u2248 ${compliance.lifetimeYears > 100 ? '>100' : compliance.lifetimeYears.toFixed(1)} years (${compliance.lifetimeDays > 36500 ? '>36500' : compliance.lifetimeDays.toFixed(0)} days)`,
       description: 'Altitude loss per orbit increases as the orbit decays (density increases exponentially).',
+      reference: 'Montenbruck & Gill, Satellite Orbits, Ch. 3.5',
     },
     {
       name: 'De-orbit Delta-V',
       formula: '\u0394V = v_circular - v_transfer',
       computed: `\u0394V = ${compliance.deorbitDeltaV.toFixed(1)} m/s (target perigee: 80 km)`,
       description: 'Hohmann transfer to lower perigee to 80 km for atmospheric re-entry.',
+      reference: 'Vallado, Fundamentals of Astrodynamics and Applications, 4th Ed., Ch. 6',
     },
   ]
 

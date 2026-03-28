@@ -11,6 +11,7 @@ export interface Equation {
   computed?: string
   description?: string
   variables?: Variable[]
+  reference?: string
 }
 
 interface EquationsPanelProps {
@@ -58,6 +59,11 @@ export default function EquationsPanel({ equations }: EquationsPanelProps) {
               {eq.description && (
                 <div className="text-[9px] text-[var(--text-tertiary)] leading-relaxed">
                   {eq.description}
+                </div>
+              )}
+              {eq.reference && (
+                <div className="text-[8px] text-[var(--text-tertiary)]/60 italic leading-relaxed">
+                  {eq.reference}
                 </div>
               )}
               {eq.variables && eq.variables.length > 0 && (

@@ -8,6 +8,8 @@ import { R_EARTH_EQUATORIAL } from '@/lib/constants'
 import EquationsPanel from '@/components/ui/EquationsPanel'
 import type { Equation } from '@/components/ui/EquationsPanel'
 import LinkBudgetSection from './LinkBudgetSection'
+import MetricCard from '@/components/ui/MetricCard'
+import { computeImagingOpportunities, computeStorageTimeline } from '@/lib/eo-imaging'
 
 export default function PassDetailsDisplay() {
   const elements = useStore((s) => s.elements)
@@ -15,6 +17,10 @@ export default function PassDetailsDisplay() {
   const groundStations = useStore((s) => s.groundStations)
   const commConfig = useStore((s) => s.commConfig)
   const selectedPassIndex = useStore((s) => s.selectedPassIndex)
+  const payloadType = useStore((s) => s.payloadType)
+  const payloadEO = useStore((s) => s.payloadEO)
+  const payloadShared = useStore((s) => s.payloadShared)
+  const eoTargets = useStore((s) => s.eoTargets)
 
   const avgAlt = elements.semiMajorAxis - R_EARTH_EQUATORIAL
 
@@ -37,6 +43,22 @@ export default function PassDetailsDisplay() {
     () => computeContactGaps(enrichedPasses),
     [enrichedPasses]
   )
+
+  // EO imaging opportunities
+  const isEO = payloadType === 'earth-observation' && eoTargets.length > 0
+  const incDeg = elements.inclination
+
+  const imagingOpps = useMemo(() => {
+    if (!isEO) return []
+    return computeImagingOpportunities(
+      elements, mission.epoch, eoTargets, payloadEO, payloadShared, avgAlt, incDeg, 3,
+    )
+  }, [isEO, elements, mission.epoch, eoTargets, payloadEO, payloadShared, avgAlt, incDeg])
+
+  const storageTimeline = useMemo(() => {
+    if (!isEO || imagingOpps.length === 0) return []
+    return computeStorageTimeline(imagingOpps, enrichedPasses, payloadShared.storageCapacity)
+  }, [isEO, imagingOpps, enrichedPasses, payloadShared.storageCapacity])
 
   // Count passes per station
   const stationCounts = useMemo(() => {
@@ -80,6 +102,7 @@ export default function PassDetailsDisplay() {
       computed: selectedLinkResult
         ? `FSPL = ${selectedLinkResult.fsplDb.toFixed(1)} dB  (d=${selectedLinkResult.slantRangeKm.toFixed(0)} km, f=${freqMHz} MHz)`
         : `FSPL = ${fsplRef.toFixed(1)} dB  (at 10\u00B0 el, d=${slantRef.toFixed(0)} km, f=${freqMHz} MHz)`,
+      reference: 'Maral & Bousquet, Satellite Communications Systems, 6th Ed.',
     },
     {
       name: 'Slant Range',
@@ -87,11 +110,13 @@ export default function PassDetailsDisplay() {
       computed: selectedLinkResult
         ? `d = ${selectedLinkResult.slantRangeKm.toFixed(0)} km  (h=${avgAlt.toFixed(0)} km, el=${selectedPass?.maxElevation.toFixed(1)}\u00B0)`
         : `d = ${slantRef.toFixed(0)} km  (h=${avgAlt.toFixed(0)} km, el=10\u00B0)`,
+      reference: 'Maral & Bousquet, Satellite Communications Systems, 6th Ed.',
     },
     {
       name: 'EIRP',
       formula: 'EIRP = P_tx + G_tx (dBW)',
       computed: `EIRP = ${txPowerDbw.toFixed(1)} + ${commConfig.satAntennaGainDbi.toFixed(1)} = ${eirpDbw.toFixed(1)} dBW  (P_tx=${commConfig.txPowerW} W)`,
+      reference: 'Maral & Bousquet, Satellite Communications Systems, 6th Ed.',
     },
     {
       name: 'Link Margin',
@@ -100,6 +125,7 @@ export default function PassDetailsDisplay() {
         ? `C/N\u2080 = ${selectedLinkResult.cn0Dbhz.toFixed(1)} dB-Hz, Margin = ${selectedLinkResult.linkMarginDb.toFixed(1)} dB`
         : undefined,
       description: 'Select a pass to see computed link margin.',
+      reference: 'Maral & Bousquet, Satellite Communications Systems, 6th Ed.',
     },
     {
       name: 'Atmospheric Loss',
@@ -107,6 +133,7 @@ export default function PassDetailsDisplay() {
       computed: selectedLinkResult
         ? `L_atm = ${selectedLinkResult.atmosphericLossDb.toFixed(1)} dB  (${commConfig.frequencyBand} at ${selectedPass?.maxElevation.toFixed(1)}\u00B0)`
         : `L_atm = ${atmLossRef.toFixed(1)} dB  (${commConfig.frequencyBand} at 10\u00B0 el)`,
+      reference: 'ITU-R P.676 (atmospheric attenuation)',
     },
   ]
 
@@ -280,6 +307,89 @@ export default function PassDetailsDisplay() {
       </SectionHeader>
 
       <LinkBudgetSection />
+
+      {/* EO Imaging Summary */}
+      {isEO && imagingOpps.length > 0 && (() => {
+        const viableOpps = imagingOpps.filter((o) => o.viable)
+        const totalDataMB = viableOpps.reduce((s, o) => s + o.dataVolumeMB, 0)
+        const dailyDataMB = totalDataMB / 3 // 3-day analysis
+        const dailyDownlinkMB = metrics.dailyDataMB
+        const netDailyMB = dailyDataMB - dailyDownlinkMB
+        const capMB = payloadShared.storageCapacity * 1024
+        const daysUntilFull = netDailyMB > 0 ? capMB / netDailyMB : Infinity
+
+        return (
+          <SectionHeader title="EO Imaging">
+            <div className="grid grid-cols-2 gap-2">
+              <MetricCard
+                label="Opportunities"
+                value={`${viableOpps.length} / ${imagingOpps.length}`}
+                status="nominal"
+              />
+              <MetricCard
+                label="Data/Day"
+                value={dailyDataMB > 1024 ? (dailyDataMB / 1024).toFixed(2) : dailyDataMB.toFixed(0)}
+                unit={dailyDataMB > 1024 ? 'GB' : 'MB'}
+                status="nominal"
+              />
+              <MetricCard
+                label="Net Storage/Day"
+                value={netDailyMB > 0 ? `+${netDailyMB.toFixed(0)}` : netDailyMB.toFixed(0)}
+                unit="MB"
+                status={netDailyMB <= 0 ? 'nominal' : daysUntilFull > 7 ? 'warning' : 'critical'}
+              />
+              <MetricCard
+                label="Days to Full"
+                value={daysUntilFull > 365 ? '∞' : daysUntilFull.toFixed(1)}
+                unit={daysUntilFull <= 365 ? 'days' : ''}
+                status={daysUntilFull > 7 ? 'nominal' : daysUntilFull > 2 ? 'warning' : 'critical'}
+              />
+            </div>
+
+            {/* Opportunity table */}
+            <div className="mt-2 max-h-[200px] overflow-y-auto">
+              <table className="w-full text-[9px] font-mono">
+                <thead>
+                  <tr className="text-[var(--text-tertiary)] border-b border-white/5">
+                    <th className="text-left py-1 px-1">Time (UTC)</th>
+                    <th className="text-left py-1 px-1">Target</th>
+                    <th className="text-right py-1 px-1">Off-Nadir</th>
+                    <th className="text-right py-1 px-1">GSD</th>
+                    <th className="text-right py-1 px-1">Sun</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {imagingOpps.slice(0, 30).map((opp, i) => (
+                    <tr
+                      key={i}
+                      className={`border-b border-white/[0.03] ${!opp.viable ? 'opacity-40' : ''}`}
+                    >
+                      <td className="py-0.5 px-1 text-[var(--text-secondary)]">
+                        {opp.startTime.toISOString().slice(5, 16).replace('T', ' ')}
+                      </td>
+                      <td className="py-0.5 px-1 text-amber-400">{opp.targetName}</td>
+                      <td className="py-0.5 px-1 text-right text-[var(--text-secondary)]">
+                        {opp.offNadirDeg.toFixed(1)}°
+                      </td>
+                      <td className="py-0.5 px-1 text-right text-accent-cyan">
+                        {opp.gsdAtTarget.toFixed(1)}m
+                      </td>
+                      <td className={`py-0.5 px-1 text-right ${opp.viable ? 'text-accent-green' : 'text-accent-red'}`}>
+                        {opp.sunElevDeg.toFixed(0)}°
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {imagingOpps.length > 30 && (
+                <div className="text-[8px] text-[var(--text-tertiary)] text-center py-1">
+                  +{imagingOpps.length - 30} more opportunities
+                </div>
+              )}
+            </div>
+          </SectionHeader>
+        )
+      })()}
 
       <EquationsPanel equations={passEquations} />
     </div>

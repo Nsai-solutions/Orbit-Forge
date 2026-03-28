@@ -29,17 +29,20 @@ export default function RadiationDisplay() {
       formula: 'TID = annual_dose \u00D7 t_mission \u00D7 shielding_factor',
       computed: `TID = ${fmtDose(rad.unshieldedDoseKradPerYear)} krad/yr \u00D7 ${mission.lifetimeTarget.toFixed(1)} yr \u00D7 ${rad.shieldingFactor.toFixed(3)} = ${fmtDose(rad.missionTotalDoseKrad)} krad`,
       description: `At ${avgAlt.toFixed(0)} km, ${incDeg.toFixed(1)}\u00B0 inclination, ${shieldingMm.toFixed(1)} mm Al shielding.`,
+      reference: 'Sawyer & Vette, AP-8 Trapped Proton Environment, NSSDC/WDC-A-R&S 76-06, 1976',
     },
     {
       name: 'AP-8 Trapped Proton Model',
       formula: 'Trapped proton flux model for radiation belts',
       computed: `At ${avgAlt.toFixed(0)} km, ${incDeg.toFixed(1)}\u00B0 inc \u2192 ${fmtDose(rad.unshieldedDoseKradPerYear)} krad/yr unshielded (incl. factor \u00D7${rad.inclinationFactor.toFixed(2)})`,
       description: 'Peak flux in inner belt (1000\u20136000 km). Models proton environment as function of altitude and magnetic field coordinates.',
+      reference: 'Sawyer & Vette, AP-8 Trapped Proton Environment, NSSDC/WDC-A-R&S 76-06, 1976',
     },
     {
       name: 'Shielding Attenuation',
       formula: 'dose = dose_unshielded \u00D7 e^(-t / \u03BB)',
       computed: `dose = ${fmtDose(rad.unshieldedDoseKradPerYear)} \u00D7 ${rad.shieldingFactor.toFixed(3)} = ${fmtDose(rad.shieldedDoseKradPerYear)} krad/yr (${shieldingMm.toFixed(1)} mm Al)`,
+      reference: 'Sawyer & Vette, AP-8 Trapped Proton Environment, NSSDC/WDC-A-R&S 76-06, 1976',
       variables: [
         { symbol: 't', definition: `${shieldingMm.toFixed(1)} mm Al` },
       ],

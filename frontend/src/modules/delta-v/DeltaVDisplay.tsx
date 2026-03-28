@@ -51,11 +51,13 @@ export default function DeltaVDisplay() {
       formula: 'v\u00B2 = \u03BC(2/r - 1/a)',
       computed: `v = \u221A(${MU_EARTH_KM.toFixed(2)} / ${rCirc.toFixed(3)}) = ${vCirc.toFixed(3)} km/s  (circular at ${avgAlt.toFixed(1)} km)`,
       description: 'Relates velocity to position and orbit shape. Core equation for all maneuver calculations.',
+      reference: 'Vallado, Fundamentals of Astrodynamics and Applications, 4th Ed., Ch. 6',
     },
     {
       name: 'Hohmann Transfer (Deorbit)',
       formula: '\u0394V = v_circular - v_transfer_apoapsis',
       computed: `\u0394V = ${budget.deorbitDeltaV.toFixed(1)} m/s  (${avgAlt.toFixed(0)} km \u2192 80 km perigee)`,
+      reference: 'Vallado, Ch. 6; Curtis, Orbital Mechanics for Engineering Students, Ch. 6',
       variables: [
         { symbol: 'a_transfer', definition: `(${rCirc.toFixed(1)} + ${(R_EARTH_EQUATORIAL + 80).toFixed(1)}) / 2 = ${((rCirc + R_EARTH_EQUATORIAL + 80) / 2).toFixed(1)} km` },
       ],
@@ -64,6 +66,7 @@ export default function DeltaVDisplay() {
       name: 'Plane Change \u0394V',
       formula: '\u0394V = 2v \u00D7 sin(\u0394i/2)',
       computed: `At ${avgAlt.toFixed(0)} km: 1\u00B0 change = ${(2 * vCirc * Math.sin(0.5 * Math.PI / 180) * 1000).toFixed(1)} m/s`,
+      reference: 'Vallado, Ch. 6; Curtis, Orbital Mechanics for Engineering Students, Ch. 6',
       variables: [
         { symbol: 'v', definition: `${vCirc.toFixed(3)} km/s at current altitude` },
       ],
@@ -72,6 +75,7 @@ export default function DeltaVDisplay() {
       name: 'Tsiolkovsky Rocket Equation',
       formula: '\u0394V = I_sp \u00D7 g\u2080 \u00D7 ln(m\u2080/m_f)',
       computed: `\u0394V = ${propulsion.specificImpulse.toFixed(0)} \u00D7 9.807 \u00D7 ln(${wetMass.toFixed(2)} / ${dryMass.toFixed(2)}) = ${budget.availableDeltaV.toFixed(1)} m/s`,
+      reference: 'Vallado, Ch. 6; Curtis, Orbital Mechanics for Engineering Students, Ch. 6',
       variables: [
         { symbol: 'I_sp', definition: `${propulsion.specificImpulse.toFixed(0)} s` },
         { symbol: 'm\u2080', definition: `${wetMass.toFixed(2)} kg (wet)` },

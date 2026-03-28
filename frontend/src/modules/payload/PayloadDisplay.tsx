@@ -47,6 +47,7 @@ export default function PayloadDisplay() {
       name: 'Ground Sample Distance',
       formula: 'GSD = (pixel_size \u00D7 altitude) / focal_length',
       computed: `GSD = (${eo.pixelSize} \u00B5m \u00D7 ${altKm.toFixed(1)} km) / ${eo.focalLength} mm = ${eoAnalysis.gsdNadir.toFixed(2)} m`,
+      reference: 'Wertz et al., Space Mission Engineering: The New SMAD, Ch. 9',
       variables: [
         { symbol: 'pixel_size', definition: `${eo.pixelSize} \u00B5m` },
         { symbol: 'focal_length', definition: `${eo.focalLength} mm` },
@@ -57,12 +58,14 @@ export default function PayloadDisplay() {
       formula: 'Swath = 2 \u00D7 altitude \u00D7 tan(FOV/2)',
       computed: `Swath = 2 \u00D7 ${altKm.toFixed(1)} km \u00D7 tan(${eoAnalysis.fovCrossTrack.toFixed(2)}\u00B0/2) = ${eoAnalysis.swathWidth.toFixed(1)} km`,
       description: `FOV = ${eoAnalysis.fovCrossTrack.toFixed(2)}\u00B0 cross-track`,
+      reference: 'Wertz et al., Space Mission Engineering: The New SMAD, Ch. 9',
     },
     {
       name: 'Signal-to-Noise Ratio',
       formula: 'SNR = (L \u00D7 \u03C1 \u00D7 \u03C4_atm \u00D7 \u03C0 \u00D7 D\u00B2 \u00D7 t_int \u00D7 QE) / (4 \u00D7 f#\u00B2 \u00D7 NEP)',
       computed: `SNR = ${eoAnalysis.snr.toFixed(0)} (f/${eoAnalysis.fNumber.toFixed(1)}, D=${eo.apertureDia} mm)`,
       description: 'Full radiometric chain from target radiance through optics to detector.',
+      reference: 'Wertz et al., Space Mission Engineering: The New SMAD, Ch. 9',
     },
   ] : []
 
